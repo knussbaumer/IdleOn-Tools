@@ -3,6 +3,12 @@ import { parseData } from '@parsers/index';
 import { getSkillEfficiency } from '@parsers/efficiency';
 import { getMaxDamage } from '@parsers/damage';
 import { getAfkGain } from '@parsers/character';
+import { getClamWorkBonus } from '@parsers/world-7/clamWork';
+import { getKillRoyShopBonus, isCompanionBonusActive } from '@parsers/misc';
+import { getBubbleBonus } from '@parsers/world-2/alchemy';
+import { getCardLevel } from '@parsers/cards';
+import { getSushiBonus } from '@parsers/world-7/sushiStation';
+import { getPlayerLabChipBonus } from '@parsers/world-4/lab';
 import { evaluateBreakdownNode } from '@parsers/breakdown';
 import { growth } from '@utility/helpers';
 import { getMonumentBonus, getMonumentMultiplier } from '@parsers/world-5/caverns/bravery';
@@ -229,6 +235,7 @@ export const analyzeSave = (raw) => {
       prayers: (c.activePrayers || []).map((x) => 'Prayer' + x?.prayerIndex),
       obols: (c.obols?.list || []).map((x) => x?.rawName).filter((x) => x && !/Locked|Blank/.test(x)),
     };
+    loadout.galleryChip = (() => { try { return getPlayerLabChipBonus(c, account, 16) ? 1 : 0; } catch (e) { return 0; } })();
     loadout.talentPreset = c.selectedTalentPreset ?? 0; loadout.cardPreset = c.selectedCardPreset ?? 0;
     const afk = afkTrees(c, characters, account);
     return { afk, loadout, presets, supers, golden, name: c.name, cls: c.class, level: c.level, skillLv: Object.fromEntries(SKILLS.map((s) => [s, c.skillsInfo?.[s]?.level ?? 0])), trees, values, statueVal, inputs };
@@ -269,6 +276,12 @@ export const analyzeSave = (raw) => {
       inventory: (g.inventoryTrophies || []).map((x) => ({ raw: x.rawName, stats: [x.UQ1txt, x.UQ2txt].filter((s) => s && s !== '0') })),
       nametags: (g.nametagsUsed || []).map((x) => ({ raw: x.rawName, level: x.level, multi: x.nametagMultiplier, stats: [x.UQ1txt, x.UQ2txt].filter((s) => s && s !== '0') })),
       hats: { count: account?.hatRack?.totalHats ?? (account?.hatRack?.hatsUsed || []).length, multi: account?.hatRack?.bonusMulti ?? null },
+      // Gallery bonus multi = 1 + (3 × gallery level + Silkrode Motherboard chip 10 + 3 × clam work + Killroy shop
+      // + Codfrey Rulz OK bubble (max 20) + Coralcave Crab card level (max 10) + Bubba the Seal + sushi) / 100
+      multiParts: (() => { const s = (f) => { try { return Number(f()) || 0; } catch (e) { return 0; } }; return {
+        level: s(() => g.rawSpelunk?.[13]?.[4]), clam: s(() => getClamWorkBonus(account, 7)), killroy: s(() => getKillRoyShopBonus(account, 3)),
+        bubble: s(() => Math.min(20, getBubbleBonus(account, 'CODFREY_RULZ_OK', false))), card: s(() => Math.min(getCardLevel(account?.cards, 'w7a11'), 10)),
+        companion: s(() => (isCompanionBonusActive(account, 49) ? account?.companions?.list?.at(49)?.bonus : 0)), sushi: s(() => getSushiBonus(account, 54)) }; })(),
     };
   } catch (e) {}
   return { gallery, trophies, chars, samples, extras, details, bisSave, lastUpdated: save.lastUpdated ?? null };

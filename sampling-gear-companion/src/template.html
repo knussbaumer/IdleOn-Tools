@@ -1122,14 +1122,14 @@ const ICONS = /*__ICONS__*/;
   const NAMETAG_MULTI = [1, 1.6, 2, 2.3, 2.5];
   const itemName = (raw) => ICONS['n:' + raw] || pretty(raw);
   const statsOf = (raw) => String(ICONS['s:' + raw] || '').split(',').filter((s) => AFK_STAT_NAMES[s]).map((s) => AFK_STAT_NAMES[s]).join(', ');
-  const galleryPanel = (skill) => {
+  const galleryPanel = (skill, char) => {
     const g = analysis.gallery; if (!g) return '<p class="dnote">Import your save again to see the gallery comparison.</p>';
     const players = BENCH.skills[skill].players.map((p) => ({ name: p.player, g: BENCH.gallery?.[p.player] }));
     const head = `<tr><th></th><th class="num">You</th>${players.map((p) => `<th class="num">${esc(p.name)}</th>`).join('')}</tr>`;
     const myPod = { 1: 0, 2: 0, 3: 0, 4: 0 }; (g.trophies || []).forEach((x) => { myPod[x.level || 1] = (myPod[x.level || 1] || 0) + 1; });
     const cmp = (label, mine, theirs, f = (v) => fmt(v)) => `<tr><td>${label}</td><td class="num">${mine == null ? '–' : f(mine)}</td>${theirs.map((v) => `<td class="num${typeof v === 'number' && typeof mine === 'number' && v > mine + 1e-9 ? ' better' : ''}">${v == null ? '–' : f(v)}</td>`).join('')}</tr>`;
     const summary = `<div class="scroll"><table class="minitable"><thead>${head}</thead><tbody>
-      ${cmp(`${ic('GalleryPodiumA3')}Gallery bonus multi`, g.multi, players.map((p) => p.g?.multi ?? null), (v) => v.toFixed(3) + '×')}
+      ${cmp(`${ic('GalleryPodiumA3')}Total podiums`, Object.values(myPod).reduce((a, b) => a + b, 0), players.map((p) => (p.g?.podiums ? Object.values(p.g.podiums).reduce((a, b) => a + b, 0) : null)))}
       ${[4, 3, 2, 1].map((lv) => cmp(`<span class="src-ctx">Level ${lv} podiums (×${PODIUM_MULTI[lv]})</span>`, myPod[lv] || 0, players.map((p) => p.g?.podiums?.[lv] ?? null))).join('')}
       ${cmp(`${ic('HatHelpA')}Hats in the hat rack`, g.hats?.count ?? null, players.map((p) => p.g?.hats?.count ?? null))}
       ${cmp('<span class="src-ctx">Hat rack bonus multi</span>', g.hats?.multi ?? null, players.map((p) => p.g?.hats?.multi ?? null), (v) => v.toFixed(2) + '×')}
@@ -1154,10 +1154,36 @@ const ICONS = /*__ICONS__*/;
       const mine = (g.nametags || []).find((x) => x.raw === raw)?.level ?? null;
       return `<tr><td>${ic(raw)}${esc(itemName(raw))}<div class="src-ctx">${esc(statsOf(raw))}</div></td><td>${lvCell(mine)}</td>${players.map((p) => { const n = p.g?.nametags?.[raw] ?? null; return `<td class="${n != null && Math.min(n, 5) > Math.min(mine ?? 0, 5) ? 'better' : ''}">${lvCell(n)}</td>`; }).join('')}</tr>`;
     }).join('');
+    // Gallery bonus multi: its own table, each source expandable.
+    const GM = [
+      ['level', 'GalleryBell', 'Gallery level', (v) => 3 * v, 'The gallery\'s own upgrade level in Spelunking: +3% per level. It also adds podiums (one per 4 levels).'],
+      ['chip', 'ConsoleChip16', 'Silkrode Motherboard lab chip', (v) => 10 * v, 'Lab chip on this character: +10% while it is equipped. Only counts for the character wearing it.'],
+      ['clam', 'ClamPearl0', 'Clam Work bonus', (v) => 3 * v, 'Clam Work bonus 8 in World 7: +3% per level.'],
+      ['killroy', 'Killroy', 'Killroy shop', (v) => v, 'The Killroy skull shop upgrade for the gallery (it also gives up to 2 level 2 podiums).'],
+      ['bubble', 'aUpgradesY32', 'Codfrey Rulz OK bubble', (v) => v, 'Alchemy bubble, capped at +20%. Level the bubble to get closer to the cap.'],
+      ['card', '2CardsJ11', 'Coralcave Crab card', (v) => v, '+1% per card level, up to level 10 (+10%). Collect more Coralcave Crab cards.'],
+      ['companion', 'Bubba', 'Bubba the Seal companion', (v) => v, 'Companion bonus: +30% once owned, +50% once upgraded in the Pet Mart.'],
+      ['sushi', 'Sushi6', 'Sushi Station bonus', (v) => v, 'The Sushi Station bonus for the gallery.'],
+    ];
+    const myParts = { ...(g.multiParts || {}), chip: char?.loadout?.galleryChip ?? 0 };
+    const pParts = players.map((p) => { const bp = BENCH.skills[skill].players.find((x) => x.player === p.name); return p.g?.multiParts ? { ...p.g.multiParts, chip: bp?.galleryChip ?? 0 } : null; });
+    const gmTotal = (pp) => (pp ? 1 + GM.reduce((a, [k, , , f]) => a + f(pp[k] || 0), 0) / 100 : null);
+    const gmOpen = openRows.has(skill + 'galmulti');
+    const gmRows = GM.map(([k, icon, label, f, how]) => {
+      const mine = f(myParts[k] || 0); const theirs = pParts.map((pp) => (pp ? f(pp[k] || 0) : null));
+      return `<tr><td>${ic(icon)}${esc(label)}<div class="src-ctx">${esc(how)}</div></td><td class="num">+${fmt(mine)}%</td>${theirs.map((v) => `<td class="num${v != null && v > mine + 1e-9 ? ' better' : ''}">${v == null ? '–' : '+' + fmt(v) + '%'}</td>`).join('')}</tr>`;
+    }).join('');
+    const gmTable = `<div class="scroll"><table class="minitable"><thead>${head}</thead><tbody>
+      <tr class="hl"><td><button type="button" class="link" data-row="galmulti" aria-expanded="${gmOpen}"><span class="chev" aria-hidden="true">${gmOpen ? '▾' : '▸'}</span>${ic('GalleryPodiumA3')}Gallery bonus multi</button><div class="src-ctx">multiplies every trophy and nametag bonus; ${esc(char?.name || '')} ${myParts.chip ? 'wears' : 'does not wear'} the Silkrode Motherboard</div></td><td class="num">${fmt(gmTotal(myParts))}×</td>${pParts.map((pp) => { const v = gmTotal(pp); return `<td class="num${v != null && v > gmTotal(myParts) + 1e-9 ? ' better' : ''}">${v == null ? '–' : fmt(v) + '×'}</td>`; }).join('')}</tr>
+      ${gmOpen ? gmRows : ''}</tbody></table></div>`;
     return `<article class="setup gal"><h3>${ic('GalleryPodiumA3', true)}Gallery and hat rack</h3>
       <p class="dnote">Gallery bonuses are account-wide. A trophy's bonus depends on the podium level it sits on (level 4 gives ×2.5, inventory only ×0.3), a nametag's on how many copies are deposited (1 to 5 copies: ×1, ×1.6, ×2, ×2.3, ×2.5; more than 5 adds nothing). Everything is then multiplied by the gallery bonus multi.</p>
-      ${summary}
       <p class="dnote">An orange underline marks a top account that is ahead of you on that line.</p>
+      <h3>Gallery bonus multi</h3>
+      <p class="dnote">Expand the row to see where it comes from and how to raise it. It is 1 + the sum of these sources ÷ 100, and it multiplies every gallery bonus.</p>
+      ${gmTable}
+      <h3>Podiums and hat rack</h3>
+      ${summary}
       <h3>Trophies with AFK gains</h3>${trophyRows ? `<div class="scroll"><table class="minitable"><thead><tr><th>Trophy</th><th class="num">You</th>${players.map((p) => `<th class="num">${esc(p.name)}</th>`).join('')}</tr></thead><tbody>${trophyRows}</tbody></table></div>` : ''}
       <div><span class="dnote">Your podiums (AFK trophies framed green):</span>${myPodiums}</div>
       <h3>Nametags with AFK gains</h3>${ntRows ? `<div class="scroll"><table class="minitable"><thead><tr><th>Nametag (copies deposited)</th><th class="num">You</th>${players.map((p) => `<th class="num">${esc(p.name)}</th>`).join('')}</tr></thead><tbody>${ntRows}</tbody></table></div>` : ''}
@@ -1194,7 +1220,7 @@ const ICONS = /*__ICONS__*/;
         <div class="stat warn"><span class="eyebrow">Close every AFK gap</span><span class="v">${fmtX(a.allGain)}</span><span class="s">AFK gains, and the same factor on the sample</span></div>
         <div class="stat"><span class="eyebrow">Including worn gear and obols</span><span class="v">${fmtX(a.fullGain)}</span><span class="s">if the loadout rows (gear, obols, cards, chips) matched too; tick "Show ignored sources" to see them</span></div>
       </div>
-      ${galleryPanel(skill)}
+      ${galleryPanel(skill, char)}
       <div class="sources"><div class="scroll"><table><thead><tr><th>AFK gains source</th><th class="num">You</th><th class="num">Top-5 median</th><th class="num">Best</th><th class="num">Gain if matched</th><th>Status</th></tr></thead>
       <tbody>${[['multi', 'Multipliers (×)', 'each one multiplies your whole AFK gains'], ['pct', 'AFK gains (%)', 'these add up, then the total is multiplied by the multipliers']].map(([id, title, note]) => { const body = rowsSorted.filter((r) => (isMultiRow(r) ? 'multi' : 'pct') === id).map(row).join(''); return body ? `<tr class="section"><td colspan="6">${esc(title)} <span class="src-ctx">${esc(note)}</span></td></tr>` + body : ''; }).join('')}</tbody></table></div></div></section>`;
   };
