@@ -424,8 +424,15 @@ const ICONS = /*__ICONS__*/;
     return u.name;
   };
 
+  // Golden food: assume the character carries the biggest stack the account can make (up to the carry cap).
+  const goldenAssumed = (skill, char) => { const g = char.golden?.[skill]; return g && g.capped > g.current ? g : null; };
+  const myTree = (skill, char) => {
+    const tree = char.trees[skill]; const g = goldenAssumed(skill, char); if (!g) return tree;
+    const leaf = leaves(tree).find((l) => l.name === 'Golden food'); if (!leaf) return tree;
+    return withLeaves(tree, { [leaf.path]: 1 + g.capped / 100 });
+  };
   const compare = (skill, char) => {
-    const mine = char.trees[skill];
+    const mine = myTree(skill, char);
     const base = evalTree(mine);
     const link = powerLink(mine);
     const players = BENCH.skills[skill].players;
@@ -745,7 +752,9 @@ const ICONS = /*__ICONS__*/;
   const LIST_KEYS = ['Stamp', 'Stamp@allbase', 'Shiny@allbase', 'Star sign'];
   const labelCell = (l) => `${ic(LABEL_ICONS[l])}${esc(l)}`;
   const inputsTable = (r, skill, char) => {
-    const mine = char.inputs?.[skill]?.[r.key];
+    let mine = char.inputs?.[skill]?.[r.key];
+    const ga = r.key === 'Golden food' ? goldenAssumed(skill, char) : null;
+    if (ga && mine) mine = mine.map((x) => (/in food slot$/.test(x.label) ? { ...x, value: ga.stack } : x)).concat([{ label: 'Owned on the account (yours)', value: ga.owned }]);
     const players = BENCH.skills[skill].players.map((p) => ({ name: p.player, v: BINP?.[skill]?.[p.player]?.[r.key] }));
     if (!mine && !players.some((p) => p.v)) return '';
     let labels; let mineVals; let theirVals;
@@ -788,8 +797,8 @@ const ICONS = /*__ICONS__*/;
       const where = [`${fmt(g.equipped)} in this character's food slots`, `${fmt(g.storage)} in storage`]
         .concat((g.holders || []).map((h) => `${fmt(h.inventory + h.food)} on ${esc(h.name)}${h.food ? ' (food slots)' : ''}`));
       const short = g.stack < (g.cap ?? Infinity) ? ` The account only owns ${fmt(g.owned)}, so that is the biggest stack you can make right now.` : '';
-      return `<div class="callout${g.gain > 1.01 ? ' warn' : ''}">${ic(g.raw)}<strong>${esc(pretty(g.name))} on the account: ${fmt(g.owned)}</strong> (${where.join(', ')}). Food carry cap: <strong>${fmt(g.cap)}</strong> per slot.
-        Carrying the most this character can, a stack of ${fmt(g.stack)}, the golden food bonus goes from ${fmt(g.current)}% to <strong>${fmt(g.capped)}%</strong>, so this multiplier goes from ${fmt(1 + g.current / 100)}× to ${fmt(1 + g.capped / 100)}×: <strong>${fmtX(g.gain)} efficiency</strong>.${short}
+      return `<div class="callout${g.gain > 1.01 ? ' warn' : ''}">${ic(g.raw)}<strong>The table assumes this character carries a full stack.</strong> ${esc(pretty(g.name))} on the account: <strong>${fmt(g.owned)}</strong> (${where.join(', ')}). Food carry cap: <strong>${fmt(g.cap)}</strong> per slot.
+        Carrying the most this character can, a stack of ${fmt(g.stack)}, the golden food bonus goes from ${fmt(g.current)}% (what the save has equipped now) to <strong>${fmt(g.capped)}%</strong>, so this multiplier goes from ${fmt(1 + g.current / 100)}× to ${fmt(1 + g.capped / 100)}×: <strong>${fmtX(g.gain)} efficiency</strong>.${short}
         The beanstalk part (golden food on the Jade Emporium beanstalk) counts either way; the golden food multiplier is ${fmt(g.multi)}×.</div>`;
     }
     if (r.key === 'Right Hand of Action') {
@@ -959,7 +968,7 @@ const ICONS = /*__ICONS__*/;
       const width = r.best && g > 1 ? Math.max(3, Math.round(100 * Math.log(g) / maxLog)) : 0;
       const u = unitLabel(r.unit);
       let out = `<tr class="${cls}">
-        <td><button type="button" class="link" data-row="${esc(r.path)}" aria-expanded="${isOpen}"><span class="chev" aria-hidden="true">${isOpen ? '▾' : '▸'}</span><span class="src-name">${rowIcons(r, skill).map((x) => ic(x)).join('')}${esc(displayName(r, skill))}</span></button><div class="src-ctx">${r.statNote ? 'Main stat, counted in base efficiency and as a multiplier · includes stats from gear' : r.derived ? 'Calculated from the power sources above; matching a power source raises this too' : esc(ctxLabel(r.ctx, skill))}</div></td>
+        <td><button type="button" class="link" data-row="${esc(r.path)}" aria-expanded="${isOpen}"><span class="chev" aria-hidden="true">${isOpen ? '▾' : '▸'}</span><span class="src-name">${rowIcons(r, skill).map((x) => ic(x)).join('')}${esc(displayName(r, skill))}</span></button><div class="src-ctx">${r.statNote ? 'Main stat, counted in base efficiency and as a multiplier · includes stats from gear' : r.derived ? 'Calculated from the power sources above; matching a power source raises this too' : esc(ctxLabel(r.ctx, skill)) + (r.key === 'Golden food' && goldenAssumed(skill, char) ? ' · yours assumes a full stack of ' + fmt(goldenAssumed(skill, char).stack) : '')}</div></td>
         <td class="num">${fmt(r.value)}${u}</td>
         <td class="num">${fmt(r.med)}${u}</td>
         <td class="num">${r.best ? fmt(r.best.value) + u + `<div class="who">${esc(r.best.player)}</div>` : '–'}</td>
