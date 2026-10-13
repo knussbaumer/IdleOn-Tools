@@ -26,5 +26,6 @@ items=json.load(open(os.environ.get('TB','.build/IdleonToolbox')+'/data/website-
 for k in list(raws):
     if (k.startswith('Trophy') or k.startswith('EquipmentNametag')) and k in items:
         raws['n:'+k]=items[k].get('displayName',k).replace('_',' ')
+        raws['s:'+k]=','.join(s for s in [str(items[k].get('UQ1txt','')), str(items[k].get('UQ2txt',''))] if s and s!='0')
 json.dump(raws,open(os.environ.get('OUT','data')+'/icons.json','w'),separators=(',',':'))
 print(len(raws), sum(len(v) for v in raws.values())//1000,'KB')

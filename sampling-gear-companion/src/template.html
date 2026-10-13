@@ -173,7 +173,14 @@ table.slots td.miss { box-shadow: inset 0 0 0 2px #d14b3b; border-color: #d14b3b
 .supers .st .slot img { width: 36px; height: 36px; object-fit: contain; image-rendering: pixelated; }
 .supers .gt { color: var(--muted); font-weight: 600; padding: 0 2px; }
 .gal .minitable td, .gal .minitable th { white-space: nowrap; }
-.gal .minitable td:first-child { min-width: 210px; }
+.gal .minitable td:first-child { min-width: 220px; white-space: normal; }
+.gal .minitable th:not(:first-child), .gal .minitable td:not(:first-child) { text-align: center; padding-inline: 8px; }
+.lvl { display: inline-block; min-width: 64px; padding: 2px 8px; border-radius: 6px; font: 500 0.8rem/1.4 var(--font-mono); background: var(--sunk); color: var(--muted); }
+.lvl.l4, .lvl.full { background: var(--ahead-soft); color: var(--ahead); }
+.lvl.l3 { background: #e3eefb; color: #2c5d94; }
+.lvl.l2 { background: var(--sunk); color: var(--fg); }
+.lvl.inv, .lvl.low, .lvl.none { background: var(--gap-soft); color: var(--gap); }
+td.better { box-shadow: inset 0 -3px 0 #d98a2b; }
 img.ic { width: 22px; height: 22px; object-fit: contain; vertical-align: middle; image-rendering: pixelated; margin-right: 6px; }
 img.ic.lg { width: 30px; height: 30px; }
 .src-name img.ic { margin-right: 6px; }
@@ -1114,13 +1121,13 @@ const ICONS = /*__ICONS__*/;
   const PODIUM_MULTI = { 1: 1, 2: 1.5, 3: 2, 4: 2.5 };
   const NAMETAG_MULTI = [1, 1.6, 2, 2.3, 2.5];
   const itemName = (raw) => ICONS['n:' + raw] || pretty(raw);
-  const statsOf = (raw) => { const it = (analysis.gallery?.trophies || []).concat(analysis.gallery?.inventory || [], analysis.gallery?.nametags || []).find((x) => x.raw === raw); return it ? it.stats.filter((s) => AFK_STAT_NAMES[s]).map((s) => AFK_STAT_NAMES[s]).join(', ') : ''; };
+  const statsOf = (raw) => String(ICONS['s:' + raw] || '').split(',').filter((s) => AFK_STAT_NAMES[s]).map((s) => AFK_STAT_NAMES[s]).join(', ');
   const galleryPanel = (skill) => {
     const g = analysis.gallery; if (!g) return '<p class="dnote">Import your save again to see the gallery comparison.</p>';
     const players = BENCH.skills[skill].players.map((p) => ({ name: p.player, g: BENCH.gallery?.[p.player] }));
     const head = `<tr><th></th><th class="num">You</th>${players.map((p) => `<th class="num">${esc(p.name)}</th>`).join('')}</tr>`;
     const myPod = { 1: 0, 2: 0, 3: 0, 4: 0 }; (g.trophies || []).forEach((x) => { myPod[x.level || 1] = (myPod[x.level || 1] || 0) + 1; });
-    const cmp = (label, mine, theirs, f = (v) => fmt(v)) => `<tr><td>${label}</td><td class="num">${mine == null ? '–' : f(mine)}</td>${theirs.map((v) => `<td class="num">${v == null ? '–' : f(v)}${typeof v === 'number' && typeof mine === 'number' && v > mine + 1e-9 ? ' <span class="pill gap">+' + fmt(v - mine) + '</span>' : ''}</td>`).join('')}</tr>`;
+    const cmp = (label, mine, theirs, f = (v) => fmt(v)) => `<tr><td>${label}</td><td class="num">${mine == null ? '–' : f(mine)}</td>${theirs.map((v) => `<td class="num${typeof v === 'number' && typeof mine === 'number' && v > mine + 1e-9 ? ' better' : ''}">${v == null ? '–' : f(v)}</td>`).join('')}</tr>`;
     const summary = `<div class="scroll"><table class="minitable"><thead>${head}</thead><tbody>
       ${cmp(`${ic('GalleryPodiumA3')}Gallery bonus multi`, g.multi, players.map((p) => p.g?.multi ?? null), (v) => v.toFixed(3) + '×')}
       ${[4, 3, 2, 1].map((lv) => cmp(`<span class="src-ctx">Level ${lv} podiums (×${PODIUM_MULTI[lv]})</span>`, myPod[lv] || 0, players.map((p) => p.g?.podiums?.[lv] ?? null))).join('')}
@@ -1128,28 +1135,29 @@ const ICONS = /*__ICONS__*/;
       ${cmp('<span class="src-ctx">Hat rack bonus multi</span>', g.hats?.multi ?? null, players.map((p) => p.g?.hats?.multi ?? null), (v) => v.toFixed(2) + '×')}
       </tbody></table></div>`;
     // Trophies with an AFK stat: where each account has them.
-    const where = (gg, raw) => { const t = (gg.trophies || []).find((x) => x.raw === raw); if (t) return { lv: t.level, txt: `podium ${t.level} (×${PODIUM_MULTI[t.level]})` }; if ((gg.inventory || []).some((x) => (x.raw || x) === raw)) return { lv: 0.3, txt: 'inventory (×0.3)' }; return null; };
+    const where = (gg, raw) => { const t = (gg.trophies || []).find((x) => x.raw === raw); if (t) return { lv: t.level, txt: `<span class="lvl l${t.level}">Lv ${t.level} ×${PODIUM_MULTI[t.level]}</span>` }; if ((gg.inventory || []).some((x) => (x.raw || x) === raw)) return { lv: 0.3, txt: '<span class="lvl inv">Inv ×0.3</span>' }; return null; };
     const trophyRaws = [];
     (g.trophies || []).concat(g.inventory || []).filter(isAfkItem).forEach((x) => trophyRaws.includes(x.raw) || trophyRaws.push(x.raw));
     players.forEach((p) => (p.g?.trophies || []).forEach((x) => trophyRaws.includes(x.raw) || trophyRaws.push(x.raw)));
     players.forEach((p) => (p.g?.inventory || []).forEach((x) => trophyRaws.includes(x) || trophyRaws.push(x)));
     const trophyRows = trophyRaws.map((raw) => {
       const m = where(g, raw);
-      return `<tr><td>${ic(raw)}${esc(itemName(raw))}<div class="src-ctx">${esc(statsOf(raw))}</div></td><td class="num">${m ? m.txt : '<span class="pill gap">not placed</span>'}</td>${players.map((p) => { const w = p.g ? where(p.g, raw) : null; return `<td class="num">${w ? w.txt : '–'}${w && (!m || w.lv > m.lv) ? ' <span class="pill gap">higher</span>' : ''}</td>`; }).join('')}</tr>`;
+      return `<tr><td>${ic(raw)}${esc(itemName(raw))}<div class="src-ctx">${esc(statsOf(raw))}</div></td><td>${m ? m.txt : '<span class="lvl none">not placed</span>'}</td>${players.map((p) => { const w = p.g ? where(p.g, raw) : null; return `<td class="${w && (!m || w.lv > m.lv) ? 'better' : ''}">${w ? w.txt : '<span class="lvl">–</span>'}</td>`; }).join('')}</tr>`;
     }).join('');
     const myPodiums = [4, 3, 2, 1].map((lv) => { const list = (g.trophies || []).filter((x) => !x.empty && (x.level || 1) === lv); return list.length ? `<div style="margin:2px 0"><span class="src-ctx">Level ${lv}:</span> ${list.map((x) => `<span title="${esc(itemName(x.raw) + (isAfkItem(x) ? ' (AFK)' : ''))}" style="display:inline-block;${isAfkItem(x) ? 'box-shadow:inset 0 0 0 2px #2f9e5a;border-radius:5px;' : ''}">${ic(x.raw, true)}</span>`).join('')}</div>` : ''; }).join('');
     // Nametags with an AFK stat: deposits (1 to 5 raise the bonus).
     const ntRaws = [];
     (g.nametags || []).filter(isAfkItem).forEach((x) => ntRaws.includes(x.raw) || ntRaws.push(x.raw));
     players.forEach((p) => Object.keys(p.g?.nametags || {}).forEach((r) => ntRaws.includes(r) || ntRaws.push(r)));
-    const lvCell = (n) => (n == null ? '–' : `${Math.min(n, 5)}/5${n > 5 ? ` <span class="src-ctx">(${n})</span>` : ''}`);
+    const lvCell = (n) => (n == null ? '<span class="lvl none">missing</span>' : `<span class="lvl ${n >= 5 ? 'full' : 'low'}" title="${n} deposited">${Math.min(n, 5)}/5 ×${NAMETAG_MULTI[Math.min(n, 5) - 1]}</span>`);
     const ntRows = ntRaws.map((raw) => {
       const mine = (g.nametags || []).find((x) => x.raw === raw)?.level ?? null;
-      return `<tr${mine == null || mine < 5 ? ' class="hl"' : ''}><td>${ic(raw)}${esc(itemName(raw))}<div class="src-ctx">${esc(statsOf(raw))}</div></td><td class="num">${mine == null ? '<span class="pill gap">missing</span>' : lvCell(mine) + (mine < 5 ? ` <span class="pill gap">×${NAMETAG_MULTI[Math.min(mine, 5) - 1]}</span>` : '')}</td>${players.map((p) => { const n = p.g?.nametags?.[raw]; return `<td class="num">${lvCell(n ?? null)}</td>`; }).join('')}</tr>`;
+      return `<tr><td>${ic(raw)}${esc(itemName(raw))}<div class="src-ctx">${esc(statsOf(raw))}</div></td><td>${lvCell(mine)}</td>${players.map((p) => { const n = p.g?.nametags?.[raw] ?? null; return `<td class="${n != null && Math.min(n, 5) > Math.min(mine ?? 0, 5) ? 'better' : ''}">${lvCell(n)}</td>`; }).join('')}</tr>`;
     }).join('');
     return `<article class="setup gal"><h3>${ic('GalleryPodiumA3', true)}Gallery and hat rack</h3>
       <p class="dnote">Gallery bonuses are account-wide. A trophy's bonus depends on the podium level it sits on (level 4 gives ×2.5, inventory only ×0.3), a nametag's on how many copies are deposited (1 to 5 copies: ×1, ×1.6, ×2, ×2.3, ×2.5; more than 5 adds nothing). Everything is then multiplied by the gallery bonus multi.</p>
       ${summary}
+      <p class="dnote">An orange underline marks a top account that is ahead of you on that line.</p>
       <h3>Trophies with AFK gains</h3>${trophyRows ? `<div class="scroll"><table class="minitable"><thead><tr><th>Trophy</th><th class="num">You</th>${players.map((p) => `<th class="num">${esc(p.name)}</th>`).join('')}</tr></thead><tbody>${trophyRows}</tbody></table></div>` : ''}
       <div><span class="dnote">Your podiums (AFK trophies framed green):</span>${myPodiums}</div>
       <h3>Nametags with AFK gains</h3>${ntRows ? `<div class="scroll"><table class="minitable"><thead><tr><th>Nametag (copies deposited)</th><th class="num">You</th>${players.map((p) => `<th class="num">${esc(p.name)}</th>`).join('')}</tr></thead><tbody>${ntRows}</tbody></table></div>` : ''}
