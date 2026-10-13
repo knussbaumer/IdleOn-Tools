@@ -66,32 +66,89 @@ export const cleanNode = (n) => {
 };
 export const cleanBreakdown = (b) => b && ({ statName: b.statName, combine: b.combine, min: b.min, max: b.max, round: b.round, step: b.step, tree: (b.tree || []).map(cleanNode) });
 
-// Super talents: for every talent of this character, how much this skill's efficiency changes with the
-// super talent levels on it (added if it is not supered yet, removed to measure it if it is).
-const withTalentLevels = (c, skillIndex, delta) => {
+// Presets: each character has 2 talent presets and up to 7 card presets. A variant swaps them into the
+// character so the efficiency formulas see that loadout. Stats (STR/WIS/AGI) stay as saved: the save only
+// has the totals for what is equipped right now.
+const flattenTalents = (tabs) => Object.values(tabs || {}).flatMap((x) => x?.orderedTalents || []);
+const withLoadout = (c, talentIdx, cardIdx) => {
+  let v = c;
+  if (talentIdx !== c.selectedTalentPreset && c.talentPreset) {
+    v = { ...v, talents: c.talentPreset.talents, flatTalents: flattenTalents(c.talentPreset.flatTalents), flatStarTalents: c.talentPreset.flatStarTalents || c.flatStarTalents };
+  }
+  if (cardIdx !== c.selectedCardPreset && Array.isArray(c.cardPresets?.[cardIdx])) {
+    const cur = c.cards?.equippedCards || [];
+    const cards = c.cardPresets[cardIdx].map((card, i) => (card?.cardIndex ? { ...card, chipBoost: cur[i]?.chipBoost, legendBonus: cur[i]?.legendBonus } : card));
+    v = { ...v, cards: { ...c.cards, equippedCards: cards } };
+  }
+  return v;
+};
+const effOf = (skill, ch, characters, account, pi, orig) => { try { return getSkillEfficiency(skill, ch, ch === orig ? characters : characters.map((x) => (x === orig ? ch : x)), account, pi)?.value; } catch (e) { return null; } };
+export const presetCheck = (c, characters, account, skill, pi) => {
+  const talentOpts = [c.selectedTalentPreset ?? 0].concat(c.talentPreset ? [(c.selectedTalentPreset ?? 0) === 0 ? 1 : 0] : []);
+  const cardOpts = (c.cardPresets || []).map((p, i) => ((p || []).some((x) => x?.cardIndex) ? i : null)).filter((i) => i !== null);
+  const curT = c.selectedTalentPreset ?? 0, curC = c.selectedCardPreset ?? 0;
+  const base = effOf(skill, c, characters, account, pi, c); if (!base) return null;
+  const combos = [];
+  for (const ti of talentOpts) for (const ci of (cardOpts.length ? cardOpts : [curC])) {
+    const v = effOf(skill, withLoadout(c, ti, ci), characters, account, pi, c);
+    if (v) combos.push({ talent: ti, card: ci, ratio: v / base, cards: (ci === curC ? c.cards?.equippedCards : c.cardPresets?.[ci] || []).map((x) => x?.cardIndex || null) });
+  }
+  combos.sort((a, b) => b.ratio - a.ratio);
+  return { current: { talent: curT, card: curC }, best: combos[0], combos };
+};
+
+// Super talents: for every talent of this loadout, how much this skill's efficiency changes with the super
+// talent levels on it (added if it is not supered, removed to measure it if it is). Talents that raise the
+// skill's main stat are estimated: a "+% stat" talent is treated as its own multiplier on the saved total,
+// so its number is an upper bound; flat "+base stat" and gear/obol stat talents cannot be worked out from a
+// save and are listed without a number.
+const MAIN_STAT = { mining: 'strength', fishing: 'strength', chopping: 'wisdom', catching: 'agility' };
+const STAT_PCT = { strength: ['OVERBLOWN_TESTOSTERONE'], agility: ['ADAPTATION_REVELATION'], wisdom: ['UTMOST_INTELLECT'] };
+const STAT_FLAT = {
+  strength: ['FIST_OF_RAGE', 'ABSOLUTE_UNIT', 'BUILT_DIFFERENT', "'STR'ESS_TESTED_GARB", 'FISTFUL_OF_OBOL'],
+  agility: ['QUICKNESS_BOOTS', 'SANIC_SPEED', 'UNREAL_AGILITY', "GARB_OF_UN'AGI'NG_QUALITY", 'SHOEFUL_OF_OBOL'],
+  wisdom: ['BOOK_OF_THE_WISE', 'INDIVIDUAL_INSIGHT', 'INDIVIDUALITY', "UNT'WIS'TED_ROBES", 'OCCULT_OBOLS'],
+};
+const withTalentLevels = (c, skillIndex, delta, statFactor, stat) => {
   const bump = (t) => (t?.skillIndex === skillIndex ? { ...t, level: (t.level || 0) + delta } : t);
   const talents = c.talents ? Object.fromEntries(Object.entries(c.talents).map(([k, v]) => [k, v?.orderedTalents ? { ...v, orderedTalents: v.orderedTalents.map(bump) } : v])) : c.talents;
-  return { ...c, flatTalents: (c.flatTalents || []).map(bump), talents };
+  const out = { ...c, flatTalents: (c.flatTalents || []).map(bump), talents };
+  if (statFactor && stat) out.stats = { ...c.stats, [stat]: (c.stats?.[stat] || 0) * statFactor };
+  return out;
 };
-export const superTalentPlan = (c, characters, account, skill, pi) => {
-  const eff = (ch, chars) => { try { return getSkillEfficiency(skill, ch, chars, account, pi)?.value; } catch (e) { return null; } };
-  const base = eff(c, characters); if (!base) return null;
+const g = (t, lv) => { try { return growth(t.funcX, lv, t.x1, t.x2, false); } catch (e) { return null; } };
+export const superTalentPlan = (c, characters, account, skill, pi, loadout) => {
+  const v = loadout || c;
+  const base = effOf(skill, v, characters, account, pi, c); if (!base) return null;
   const bonus = c?.superTalentsInfo?.bonus || getSuperTalentAddedLevels(account) || 0;
-  const supered = new Set((c?.superTalentsInfo?.talents || []).map((x) => x.talentIndex));
-  const out = [];
+  const stat = MAIN_STAT[skill];
+  const out = [], extra = [];
   const seen = new Set();
-  for (const t of c.flatTalents || []) {
+  for (const t of v.flatTalents || []) {
     if (!t || seen.has(t.skillIndex) || !(t.level >= 1) || !t.name || /^_|FILLER/.test(t.name)) continue;
     seen.add(t.skillIndex);
-    const isSuper = supered.has(t.skillIndex);
-    const c2 = withTalentLevels(c, t.skillIndex, isSuper ? -bonus : bonus);
-    const v = eff(c2, characters.map((x) => (x === c ? c2 : x)));
-    if (!v) continue;
-    const gain = isSuper ? base / v : v / base;
-    if (gain > 1.0005) out.push({ skillIndex: t.skillIndex, name: t.name, level: t.level, baseLevel: t.baseLevel, maxLevel: t.maxLevel, supered: isSuper, gain, description: t.description, value: (() => { try { return growth(t.funcX, t.level, t.x1, t.x2, false); } catch (e) { return null; } })() });
+    const isSuper = !!t.isSuperTalent;
+    const delta = isSuper ? -bonus : bonus;
+    let statFactor = null, statNote = null;
+    if (STAT_PCT[stat].includes(t.name)) {
+      const b0 = g(t, t.level) || 0, b1 = g(t, t.level + delta) || 0;
+      statFactor = (1 + b1 / 100) / (1 + b0 / 100);
+      statNote = `+${Math.abs(b1 - b0).toFixed(1)}% ${stat} from the super levels (estimated as its own multiplier, so this is an upper bound)`;
+    }
+    const item = { skillIndex: t.skillIndex, name: t.name, level: t.level, baseLevel: t.baseLevel, supered: isSuper, description: t.description, value: g(t, t.level), statNote };
+    if (STAT_FLAT[stat].includes(t.name)) {
+      const d = Math.abs((g(t, t.level + bonus) || 0) - (g(t, t.level) || 0));
+      extra.push({ ...item, gain: null, statNote: `Raises ${stat}${d ? ' (+' + Math.round(d).toLocaleString('en-US') + ' from the super levels)' : ''}. More ${stat} means bigger samples, but how much depends on your other ${stat} sources, which the save does not break down.` });
+      continue;
+    }
+    const c2 = withTalentLevels(v, t.skillIndex, delta, statFactor, stat);
+    const val = effOf(skill, c2, characters, account, pi, c);
+    if (!val) continue;
+    const gain = isSuper ? base / val : val / base;
+    if (gain > 1.0005) out.push({ ...item, gain, estimate: !!statFactor });
   }
   out.sort((a, b) => b.gain - a.gain);
-  return { bonus, slotsUsed: supered.size, list: out };
+  return { bonus, slotsUsed: (v.flatTalents || []).filter((t) => t?.isSuperTalent).length, list: out.concat(extra) };
 };
 
 export const characterTrees = (c, characters, account) => {
@@ -126,7 +183,16 @@ export const analyzeSave = (raw) => {
     const inputs = Object.fromEntries(SKILLS.map((s) => { try { return [s, INPUTS.forSkill(account, characters, c, s, piForInputs)]; } catch (e) { return [s, { __error: [{ label: String(e && e.stack || e).slice(0, 300), value: null }] }]; } }));
     const statueVal = Object.fromEntries(SKILLS.map((s) => [s, DETAILS.forSkill(account, characters, c, s)?.statue?.statue?.value ?? null]));
     const golden = Object.fromEntries(SKILLS.map((s) => { try { return [s, goldenWhatIf(c, characters, account, s)]; } catch (e) { return [s, null]; } }));
-    const supers = Object.fromEntries(SKILLS.filter((s) => FAMILY[s].includes(c.class) || samples[s]?.char === c.name).map((s) => { try { return [s, superTalentPlan(c, characters, account, s, piForInputs)]; } catch (e) { return [s, null]; } }));
+    const planSkills = SKILLS.filter((s) => FAMILY[s].includes(c.class) || samples[s]?.char === c.name);
+    const presets = Object.fromEntries(planSkills.map((s) => { try { return [s, presetCheck(c, characters, account, s, piForInputs)]; } catch (e) { return [s, null]; } }));
+    // Super talent plan for the talent preset that is best for this skill.
+    const supers = Object.fromEntries(planSkills.map((s) => {
+      try {
+        const bt = presets[s]?.best?.talent ?? c.selectedTalentPreset ?? 0;
+        const plan = superTalentPlan(c, characters, account, s, piForInputs, withLoadout(c, bt, c.selectedCardPreset ?? 0));
+        return [s, plan && { ...plan, talentPreset: bt }];
+      } catch (e) { return [s, null]; }
+    }));
     const loadout = {
       equip: (c.equipment || []).map((x) => x?.rawName).filter((x) => x && x !== 'Blank'),
       tools: (c.tools || []).map((x) => x?.rawName).filter((x) => x && x !== 'Blank'),
@@ -137,7 +203,8 @@ export const analyzeSave = (raw) => {
       prayers: (c.activePrayers || []).map((x) => 'Prayer' + x?.prayerIndex),
       obols: (c.obols?.list || []).map((x) => x?.rawName).filter((x) => x && !/Locked|Blank/.test(x)),
     };
-    return { loadout, supers, golden, name: c.name, cls: c.class, level: c.level, skillLv: Object.fromEntries(SKILLS.map((s) => [s, c.skillsInfo?.[s]?.level ?? 0])), trees, values, statueVal, inputs };
+    loadout.talentPreset = c.selectedTalentPreset ?? 0; loadout.cardPreset = c.selectedCardPreset ?? 0;
+    return { loadout, presets, supers, golden, name: c.name, cls: c.class, level: c.level, skillLv: Object.fromEntries(SKILLS.map((s) => [s, c.skillsInfo?.[s]?.level ?? 0])), trees, values, statueVal, inputs };
   });
   const h = account?.hole?.holesObject || {};
   const extras = {};

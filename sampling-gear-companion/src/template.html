@@ -905,27 +905,42 @@ const ICONS = /*__ICONS__*/;
     CHECK = null;
     return html;
   };
+  const talentTip = (t, sp, skill) => {
+    const fmtLv = (v) => (typeof v === 'number' ? Math.round(v).toLocaleString('en-US') : '–');
+    const val = typeof t.value === 'number' ? fmt(t.value) : '#';
+    const lab = SK_ICON[skill].label.toLowerCase();
+    const lines = [`Level ${fmtLv(t.level)} (base ${fmtLv(t.baseLevel)})`];
+    if (t.gain) lines.push(t.supered ? `Its +${sp.bonus} super levels are worth ${t.estimate ? 'up to ' : ''}${fmtX(t.gain)} ${lab} efficiency` : `Supering it (+${sp.bonus} levels): ${t.estimate ? 'up to ' : ''}${fmtX(t.gain)} ${lab} efficiency`);
+    if (t.statNote) lines.push(t.statNote);
+    lines.push(pretty(t.description || '').replace(/[{}]/g, val));
+    return { title: pretty(t.name).toLowerCase().replace(/(^|\s)\S/g, (m) => m.toUpperCase()), type: t.supered ? 'Supered talent' : 'Not supered', lines };
+  };
   const superHtml = (skill, char) => {
     const sp = char?.supers?.[skill];
     if (!sp) return `<article class="setup"><h3>Super talent priority</h3><p class="dnote">${char?.loadout ? 'Worked out for characters of this skill\'s class family and your best sampler. Pick one of those above.' : 'Import your save again to see this.'}</p></article>`;
-    const fmtLv = (v) => (typeof v === 'number' ? Math.round(v).toLocaleString('en-US') : '–');
-    const items = sp.list.map((t) => {
-      const val = typeof t.value === 'number' ? fmt(t.value) : '#';
-      const tip = { title: pretty(t.name).toLowerCase().replace(/(^|\s)\S/g, (m) => m.toUpperCase()), type: t.supered ? 'Supered talent' : 'Not supered',
-        lines: [`Level ${fmtLv(t.level)} (base ${fmtLv(t.baseLevel)})`, t.supered ? `Its +${sp.bonus} super levels are worth ${fmtX(t.gain)} ${SK_ICON[skill].label.toLowerCase()} efficiency` : `Supering it (+${sp.bonus} levels): ${fmtX(t.gain)} ${SK_ICON[skill].label.toLowerCase()} efficiency`, pretty(t.description || '').replace(/[{}]/g, val)] };
-      return `<span class="st ${t.supered ? 'have' : 'miss'}">${slotBtn({ raw: 'UISkillIcon' + t.skillIndex, src: ICONS['UISkillIcon' + t.skillIndex], tip }, 'Talent')}</span>`;
-    });
-    return `<article class="setup"><h3>Super talent priority</h3>
-      ${items.length ? `<div class="supers">${items.join('<span class="gt" aria-hidden="true">&gt;</span>')}</div>` : '<p class="dnote">None of this character\'s talents change this skill\'s efficiency.</p>'}
-      <p class="dnote">Every talent of ${esc(char.name)} that changes ${esc(SK_ICON[skill].label.toLowerCase())} efficiency, best first, ranked by what +${sp.bonus} super talent levels do for it. ${sp.slotsUsed} talents are supered on this character in total, including ones that do nothing for this skill.</p></article>`;
+    const icon = (t) => `<span class="st ${t.supered ? 'have' : 'miss'}">${slotBtn({ raw: 'UISkillIcon' + t.skillIndex, src: ICONS['UISkillIcon' + t.skillIndex], tip: talentTip(t, sp, skill) }, 'Talent')}</span>`;
+    const ranked = sp.list.filter((t) => t.gain), extra = sp.list.filter((t) => !t.gain);
+    const statName = { mining: 'Strength', fishing: 'Strength', chopping: 'Wisdom', catching: 'Agility' }[skill];
+    return `<article class="setup"><h3>Super talent priority <span class="src-ctx">talent preset ${(sp.talentPreset ?? 0) + 1}</span></h3>
+      ${ranked.length ? `<div class="supers">${ranked.map(icon).join('<span class="gt" aria-hidden="true">&gt;</span>')}</div>` : '<p class="dnote">None of this character\'s talents change this skill\'s efficiency.</p>'}
+      ${extra.length ? `<div class="supers"><span class="src-ctx" style="margin-right:6px">Also raise ${statName}:</span>${extra.map(icon).join('')}</div>` : ''}
+      <p class="dnote">Talents of ${esc(char.name)} that change ${esc(SK_ICON[skill].label.toLowerCase())} efficiency, best first, ranked by what +${sp.bonus} super talent levels do for them, on talent preset ${(sp.talentPreset ?? 0) + 1} (the better one for this skill). The "+% ${statName}" talent is an upper estimate. The second row raises ${statName} too (more ${statName}, bigger samples), but by how much depends on all your other ${statName} sources, which the save only has as a total, so those are not ranked. ${sp.slotsUsed} talents are supered on this preset in total.</p></article>`;
   };
-  const spotsHtml = () => {
-    if (!BIS.spots) return '';
-    const ic = (s, cat) => `<td class="ic">${s ? slotBtn(s, cat) : ''}</td>`;
-    const body = BIS.spots.map((p) => `<tr><td colspan="6" class="sub">${esc(p.title)}</td></tr>` + p.rows.map((r) => `<tr>${ic(r.fish, 'Fish')}<td>${esc(r.fish.tip.title)}</td>${ic(r.bait, 'Bait')}${ic(r.line, 'Line')}${ic(r.ring, 'Ring')}<td>${r.loc ? esc(r.loc) : ''}${r.note ? `<div class="src-ctx">${esc(r.note)}</div>` : ''}</td></tr>`).join('')).join('');
-    return `<article class="setup spots"><h3>Fishing spots</h3>
-      <div class="scroll"><table class="minitable"><thead><tr><th colspan="2">Fish</th><th>Bait</th><th>Line</th><th>Ring</th><th>Where</th></tr></thead><tbody>${body}</tbody></table></div>
-      <p class="dnote">${slotBtn(BIS.zeus, 'Line')} For Bloach, Kraken and Caulifish, Zeus Gon Fishin was better than Platinum Twine depending on whether you were at an efficiency break point. Try it out yourself, or just use Platinum Twine. The difference is 1 to 2% at best.</p></article>`;
+  const presetHtml = (skill, char) => {
+    const p = char?.presets?.[skill]; if (!p || !p.best) return '';
+    const lab = SK_ICON[skill].label.toLowerCase();
+    const cur = p.current, best = p.best;
+    const byTalent = {}; p.combos.forEach((c) => { byTalent[c.talent] = Math.max(byTalent[c.talent] || 0, c.ratio); });
+    const cardsAtBest = p.combos.filter((c) => c.talent === best.talent);
+    const cardSpread = Math.max(...cardsAtBest.map((c) => c.ratio)) / Math.min(...cardsAtBest.map((c) => c.ratio));
+    const same = best.talent === cur.talent && (best.card === cur.card || cardSpread < 1.001);
+    const tRow = Object.keys(byTalent).map(Number).sort().map((i) => `<span class="pill ${i === best.talent ? 'ahead' : 'even'}">Talent preset ${i + 1}${i === cur.talent ? ' (active)' : ''}: ${fmtX(byTalent[i] * (1 / (p.combos.find((c) => c.talent === cur.talent && c.card === cur.card)?.ratio || 1)))}</span>`).join(' ');
+    const cRow = cardsAtBest.slice().sort((a, b) => a.card - b.card).map((c) => `<span class="pill ${c.card === best.card && cardSpread >= 1.001 ? 'ahead' : 'even'}">Cards ${c.card + 1}${c.card === cur.card ? ' (active)' : ''}: ${fmtX(c.ratio / (p.combos.find((x) => x.talent === best.talent && x.card === cur.card)?.ratio || 1))}</span>`).join(' ');
+    const verdict = same ? `<div class="callout">The active presets are already the best for ${lab}.</div>`
+      : `<div class="callout warn"><strong>Use talent preset ${best.talent + 1}${cardSpread >= 1.001 && best.card !== cur.card ? ` and card preset ${best.card + 1}` : ''}</strong> for ${lab}: ${fmtX(best.ratio)} efficiency compared with what is active now (talent preset ${cur.talent + 1}, card preset ${cur.card + 1}).</div>`;
+    return `<article class="setup"><h3>Talent and card presets</h3>${verdict}
+      <div class="supers">${tRow}</div><div class="supers">${cRow}</div>
+      <p class="dnote">Every talent preset with every card preset, run through the ${lab} efficiency formula. ${cardSpread < 1.001 ? 'The card presets make no difference here: with the Rift skill mastery bonus every card you own counts for skill efficiency, not only the equipped ones. ' : ''}Stats from talents and cards (${lab === 'chopping' ? 'Wisdom' : lab === 'catching' ? 'Agility' : 'Strength'}) are not part of this check, because the save only has the totals for what is equipped right now.</p></article>`;
   };
   const bisSection = (skill, char) => {
     TIPS = [];
@@ -933,7 +948,7 @@ const ICONS = /*__ICONS__*/;
     return `<section class="bis-wrap" aria-label="Best in slot">
       <div class="bis-head"><h2>Best in slot</h2><span class="dnote">Hover or tap an item for its description and stats.</span></div>
       <div class="checks-key"><span><i style="box-shadow:inset 0 0 0 2px #2f9e5a"></i>supered / equipped on ${esc(char?.name || 'this character')}</span><span><i style="box-shadow:inset 0 0 0 2px #d14b3b"></i>not supered / not equipped</span><span>Trophies are checked against your gallery. The snapshot setups are not checked.</span></div>
-      <div class="bis-boards">${superHtml(skill, char)}${boards.map((b) => bisBoard(b, char)).join('')}${skill === 'fishing' ? spotsHtml() : ''}</div>
+      <div class="bis-boards">${presetHtml(skill, char)}${superHtml(skill, char)}${boards.map((b) => bisBoard(b, char)).join('')}${skill === 'fishing' ? spotsHtml() : ''}</div>
       <p class="credit">Taken and updated from AlmostPsycho's Sampling Sheet, Thank you.</p>
     </section>`;
   };
