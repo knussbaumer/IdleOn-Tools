@@ -27,13 +27,21 @@ const goldenWhatIf = (c, characters, account, skill) => {
   const cap = getItemCapacity('cFood', c, account)?.value ?? null;
   const equipped = (c?.food || []).filter((f) => f?.name === name).reduce((a, f) => a + (Number(f.amount) || 0), 0);
   const storage = (account?.storage?.list || []).filter((x) => x?.rawName === raw || x?.name === name).reduce((a, x) => a + (Number(x.amount) || 0), 0);
+  // Everything the account owns: storage, every character's inventory and every character's food slots.
+  const holders = (characters || []).map((ch) => ({
+    name: ch.name,
+    inventory: (ch.inventory || []).filter((i) => i?.rawName === raw).reduce((s, i) => s + (Number(i.amount) || 0), 0),
+    food: ch.name === c.name ? 0 : (ch.food || []).filter((f) => f?.name === name).reduce((s, f) => s + (Number(f.amount) || 0), 0),
+  })).filter((h) => h.inventory || h.food);
+  const elsewhere = holders.reduce((s, h) => s + h.inventory + h.food, 0);
+  const owned = equipped + storage + elsewhere;
   const multi = getGoldenFoodMulti(c, account, characters)?.value ?? 1;
   const amount = ITEMS?.[raw]?.Amount ?? 0;
   const part = (q) => (!q ? 0 : amount * multi * 0.05 * lavaLog(1 + q) * (1 + lavaLog(1 + q) / 2.14));
   const current = getGoldenFoodBonus(name, c, account, characters) || 0;
-  const stack = cap == null ? equipped + storage : Math.min(cap, equipped + storage);
+  const stack = cap == null ? owned : Math.min(cap, owned);
   const capped = current - part(equipped) + part(stack);
-  return { name, raw, cap, equipped, storage, stack, multi, current, capped, gain: (1 + capped / 100) / (1 + current / 100) };
+  return { name, raw, cap, equipped, storage, holders, owned, stack, multi, current, capped, gain: (1 + capped / 100) / (1 + current / 100) };
 };
 const INPUTS = makeInputs();
 const DETAILS = makeDetails({ evaluateBreakdownNode, growth, getMonumentBonus, getMonumentMultiplier, getFountainBonusTotal, getCosmoBonus, getStatueBonus, getVialMultiplier, getMealBonus, getMealMaxLevel });

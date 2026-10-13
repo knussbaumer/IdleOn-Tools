@@ -265,12 +265,20 @@ const ICONS = /*__ICONS__*/;
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const pretty = (s) => String(s ?? '').replace(/_/g, ' ');
 
+  // Big numbers: M, B and T up to 1000T, scientific (e) notation only beyond that.
+  const compact = (v) => {
+    const a = Math.abs(v);
+    if (a >= 1e15) return v.toExponential(2).replace('e+', 'e');
+    const [d, s] = a >= 1e12 ? [1e12, 'T'] : a >= 1e9 ? [1e9, 'B'] : [1e6, 'M'];
+    const n = v / d, m = Math.abs(n);
+    return (m >= 100 ? n.toFixed(1) : m >= 10 ? n.toFixed(2) : n.toFixed(2)).replace(/\.?0+$/, '') + s;
+  };
   const fmt = (v) => {
     if (v === null || v === undefined || Number.isNaN(v)) return '–';
     const a = Math.abs(v);
     if (a === 0) return '0';
     if (Number.isInteger(v) && a < 1e6) return v.toLocaleString('en-US');
-    if (a >= 1e6) return v.toExponential(2).replace('e+', 'e');
+    if (a >= 1e6) return compact(v);
     if (a >= 1000) return Math.round(v).toLocaleString('en-US');
     if (a >= 100) return v.toFixed(1);
     if (a >= 10) return v.toFixed(2);
@@ -278,7 +286,8 @@ const ICONS = /*__ICONS__*/;
   };
   const fmtX = (r) => {
     if (!isFinite(r)) return '–';
-    if (r >= 100) return r.toExponential(1).replace('e+', 'e') + '×';
+    if (r >= 1e6) return compact(r) + '×';
+    if (r >= 100) return Math.round(r).toLocaleString('en-US') + '×';
     if (r >= 10) return r.toFixed(1) + '×';
     return r.toFixed(r >= 1.995 ? 2 : 3) + '×';
   };
@@ -776,10 +785,12 @@ const ICONS = /*__ICONS__*/;
   const callout = (r, skill, char) => {
     if (r.key === 'Golden food') {
       const g = char.golden?.[skill]; if (!g) return '';
-      const short = g.stack < (g.cap ?? Infinity) ? ` Storage only holds ${fmt(g.storage)}, so that is the most you can put in the slot right now.` : '';
-      return `<div class="callout${g.gain > 1.01 ? ' warn' : ''}">${ic(g.raw)}<strong>${esc(pretty(g.name))}:</strong> ${fmt(g.equipped)} in this character's food slots, ${fmt(g.storage)} in storage. Food carry cap: <strong>${fmt(g.cap)}</strong> per slot.
-        With a stack of ${fmt(g.stack)} in a food slot the golden food bonus goes from ${fmt(g.current)}% to <strong>${fmt(g.capped)}%</strong>, so this multiplier goes from ${fmt(1 + g.current / 100)}× to ${fmt(1 + g.capped / 100)}×: <strong>${fmtX(g.gain)} efficiency</strong>.${short}
-        The beanstalk part (golden food on the Jade Emporium beanstalk) stays either way; the golden food multiplier is ${fmt(g.multi)}×.</div>`;
+      const where = [`${fmt(g.equipped)} in this character's food slots`, `${fmt(g.storage)} in storage`]
+        .concat((g.holders || []).map((h) => `${fmt(h.inventory + h.food)} on ${esc(h.name)}${h.food ? ' (food slots)' : ''}`));
+      const short = g.stack < (g.cap ?? Infinity) ? ` The account only owns ${fmt(g.owned)}, so that is the biggest stack you can make right now.` : '';
+      return `<div class="callout${g.gain > 1.01 ? ' warn' : ''}">${ic(g.raw)}<strong>${esc(pretty(g.name))} on the account: ${fmt(g.owned)}</strong> (${where.join(', ')}). Food carry cap: <strong>${fmt(g.cap)}</strong> per slot.
+        Carrying the most this character can, a stack of ${fmt(g.stack)}, the golden food bonus goes from ${fmt(g.current)}% to <strong>${fmt(g.capped)}%</strong>, so this multiplier goes from ${fmt(1 + g.current / 100)}× to ${fmt(1 + g.capped / 100)}×: <strong>${fmtX(g.gain)} efficiency</strong>.${short}
+        The beanstalk part (golden food on the Jade Emporium beanstalk) counts either way; the golden food multiplier is ${fmt(g.multi)}×.</div>`;
     }
     if (r.key === 'Right Hand of Action') {
       const v = inp(char, skill, r.key, 'Voidwalker'); const act = inp(char, skill, r.key, 'Active');
