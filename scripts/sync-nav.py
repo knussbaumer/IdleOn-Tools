@@ -7,7 +7,7 @@ import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 snippet = open(os.path.join(ROOT, 'assets', 'nav-snippet.html'), encoding='utf-8').read().strip()
-TOOLS = {'gap': ['sample-gap-finder/index.html', 'sample-gap-finder/src/template.html'],
+TOOLS = {'gap': ['sampling-gear-companion/index.html', 'sampling-gear-companion/src/template.html'],
          'stamp': ['stamp-planner/index.html', 'stamp-planner/src/page-body.html']}
 MARGIN = {'gap': '-24px -16px 18px', 'stamp': '0'}
 block = re.compile(r'<!-- tools-nav:.*?<!-- /tools-nav -->\n?', re.S)

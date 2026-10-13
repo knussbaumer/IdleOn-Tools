@@ -1,4 +1,4 @@
-// Detail panels for the Sample Gap Finder. Written as a factory over IdleonToolbox functions so the same
+// Detail panels for the Sampling and Gear Companion. Written as a factory over IdleonToolbox functions so the same
 // source runs in the bundle (local imports) and on idleontoolbox.com (live modules) for the top samplers.
 export const makeDetails = (api) => {
   const MON_T = { mining: 0, chopping: 2, catching: 1 };

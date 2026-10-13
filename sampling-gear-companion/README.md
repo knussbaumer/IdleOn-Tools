@@ -1,4 +1,4 @@
-# Sample Gap Finder
+# Sampling and Gear Companion
 
 Compares your 3D Printer sampling characters with the top public samplers for Copper (Mining), Oak Logs (Logs), Flies (Catching) and Goldfish (Fishing).
 

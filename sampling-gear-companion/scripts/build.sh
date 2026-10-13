@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rebuilds the Sample Gap Finder bundle and index.html from IdleonToolbox source.
+# Rebuilds the Sampling and Gear Companion bundle and index.html from IdleonToolbox source.
 # Usage: scripts/build.sh [toolbox-commit]   (defaults to the commit below)
 set -euo pipefail
 
@@ -30,4 +30,4 @@ fi
 
 # 3. Assemble index.html (no save data is embedded).
 python3 "$ROOT/scripts/assemble.py" "$ROOT"
-echo "Built sample-gap-finder/index.html from IdleonToolbox $TOOLBOX_COMMIT"
+echo "Built sampling-gear-companion/index.html from IdleonToolbox $TOOLBOX_COMMIT"

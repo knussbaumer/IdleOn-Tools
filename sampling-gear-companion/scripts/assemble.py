@@ -3,7 +3,7 @@
 The top-sampler benchmarks (data/bench*.json) are a snapshot of public IdleonToolbox profiles.
 No personal save is embedded: the page starts empty and the user imports their own.
 
-Usage: python3 scripts/assemble.py <sample-gap-finder dir>
+Usage: python3 scripts/assemble.py <sampling-gear-companion dir>
 """
 import os
 import sys

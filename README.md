@@ -6,7 +6,7 @@ Calculators for [Legends of IdleOn](https://www.legendsofidleon.com/), all in on
 
 | Tool | What it does |
 | --- | --- |
-| [Sample Gap Finder](sample-gap-finder/) | 3D Printer samples: compares your Mining, Logs, Catching and Fishing efficiency with the top public samplers, source by source, with best-in-slot setups. |
+| [Sampling and Gear Companion](sampling-gear-companion/) | 3D Printer samples: compares your Mining, Logs, Catching and Fishing efficiency with the top public samplers, source by source, with best-in-slot setups. |
 | [Stamp Upgrade Planner](stamp-planner/) | Which stamp upgrades fit in a character's inventory, with Gilded Stamps and Hydrogen, sorted by how close to the carry cap they are. |
 
 ## Layout
@@ -15,23 +15,23 @@ Calculators for [Legends of IdleOn](https://www.legendsofidleon.com/), all in on
 index.html              landing page with the tool menu
 assets/                 landing page icons and the shared tool menu (nav-snippet.html)
 scripts/sync-nav.py     puts the shared menu at the top of every tool page
-sample-gap-finder/      index.html, its sources (src/), data snapshot (data/) and build scripts
+sampling-gear-companion/      index.html, its sources (src/), data snapshot (data/) and build scripts
 stamp-planner/          index.html, engine.js, sources (src/) and build scripts
 ```
 
 Each tool is a self-contained page. To rebuild one after a game update:
 
 ```bash
-sample-gap-finder/scripts/build.sh   # bundles IdleonToolbox + src/kimgap, assembles index.html
+sampling-gear-companion/scripts/build.sh   # bundles IdleonToolbox + src/kimgap, assembles index.html
 stamp-planner/scripts/build.sh       # bundles engine.js, assembles index.html
 python3 scripts/sync-nav.py          # refresh the shared menu in the rebuilt pages
 ```
 
 Both build scripts need Node 20+, Python 3 and git, and clone IdleonToolbox into the tool's `.build/` folder.
 
-### Sample Gap Finder data
+### Sampling and Gear Companion data
 
-`sample-gap-finder/data/bench*.json` is a snapshot of the five best public samplers per printer item from the IdleonToolbox leaderboards (efficiency breakdown leaves, statue, monument, vial and meal details, and the inputs behind each source). `bis.json` holds the best-in-slot boards and `icons.json` the row icons; both can be regenerated with `REBUILD_IMAGES=1 scripts/build.sh`.
+`sampling-gear-companion/data/bench*.json` is a snapshot of the five best public samplers per printer item from the IdleonToolbox leaderboards (efficiency breakdown leaves, statue, monument, vial and meal details, and the inputs behind each source). `bis.json` holds the best-in-slot boards and `icons.json` the row icons; both can be regenerated with `REBUILD_IMAGES=1 scripts/build.sh`.
 
 ## Adding a tool
 
