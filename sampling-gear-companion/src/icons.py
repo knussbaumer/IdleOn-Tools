@@ -14,6 +14,17 @@ for r in ['aUpgradesO2','aUpgradesP2','aUpgradesO21','aUpgradesP21','aUpgradesG2
 import glob
 for f in sorted(glob.glob(IMG+'data/UISkillIcon*.png')):
     raws[os.path.basename(f)[:-4]]='data:image/png;base64,'+base64.b64encode(open(f,'rb').read()).decode()
+for pat in ['Trophy[0-9]*.png', 'EquipmentNametag[0-9]*.png']:
+    for f in sorted(glob.glob(IMG+'data/'+pat)):
+        raws[os.path.basename(f)[:-4]]='data:image/png;base64,'+base64.b64encode(open(f,'rb').read()).decode()
+for r in ['aUpgradesO17','aUpgradesP17','aUpgradesG17','aSiga16','HoleUIbuildUpg49','RooA','BribeW','PachiBall1','DungeonA7','SignStar1b','TrapBoxSet1','CompassUpg9','2CardsZ11','CardSet2','GalleryPodiumA3','HatHelpA','PremiumGem','TaskAchBorder1','ConsoleChip11','ConsoleChip8','Island1','DivGod0','DivGod4','ClassIcons42','ClassIcons44','ClassIcons45','ClassIcons47','ClassIcons59','ClassIcons55','HoopShop3','ConTowerB26','Bravery_Monument_x1','Justice_Monument_x1','Wisdom_Monument_x1','VaultUpg23','Prayer4','Prayer12','FoodG12','EquipmentHats123','ObolHyper1','Copper','OakTree','Bug1','Fish1','FishTKweight13','ArcaneHelp','EquipmentNametag15','ClassIcons21','ClassIcons25','ClassIcons4','EquipmentTools16','EquipmentToolsHatchet13','CatchingNet13','FishingRod13']:
+    add(r)
+for r,pth in [('Tome_0','etc/Tome_0.png'),('Friends','etc/Friends.png'),('Guild','etc/Guild.png'),('VoteBallot','etc/VoteBallot.png'),('Event_Currency','etc/Event_Currency.png'),('TasksStar','etc/TasksStar.png'),('Mega_Grumblo','etc/Mega_Grumblo.png'),('PassiveCard','etc/PassiveCard.png'),('Armor_Set_Smithy','etc/Armor_Set_Smithy.png'),('beanG','monsters/beanG/static.png'),('Pet12','monsters/Pet12/static.png')]:
+    add(r,pth)
 add('w5b1','monsters/w5b1/static.png')
+items=json.load(open(os.environ.get('TB','.build/IdleonToolbox')+'/data/website-data/items.json'))
+for k in list(raws):
+    if (k.startswith('Trophy') or k.startswith('EquipmentNametag')) and k in items:
+        raws['n:'+k]=items[k].get('displayName',k).replace('_',' ')
 json.dump(raws,open(os.environ.get('OUT','data')+'/icons.json','w'),separators=(',',':'))
 print(len(raws), sum(len(v) for v in raws.values())//1000,'KB')

@@ -662,7 +662,17 @@ const ICONS = /*__ICONS__*/;
     'Studious Quester talent@alleff': ['UISkillIcon617'], 'Ancient Multitool talent@alleff': ['UISkillIcon646'], 'Supersource talent@allbase': ['UISkillIcon636'],
     'Stamp@allbase': ['StampB46'], 'Shiny@allbase': ['Mface9', 'Mface13', 'Mface21', 'Mface29'], 'Nobisect blessing@allbase': ['DivGod2'], 'Jewel@allbase': ['ConsoleJwl12'],
     'Frost Relic artifact@alleff': ['Arti15'], 'Palette@alleff': ['GamingPal'], 'Companion@alleff': ['w5b1'], 'Prayer@alleff': ['Prayer1'], 'Post office@allbase': ['UIboxUpg20'],
-    'Meal@alleff': ['CookingMB6', 'CookingMB27', 'CookingMB41'], 'Vial@alleff': ['GodshardBar'], 'Star sign': ['ConsoleChip15'],
+    'Meal@alleff': ['CookingMB6', 'CookingMB27', 'CookingMB41'], 'Vial@alleff': ['GodshardBar'], 'Star sign': ['SignStar1b'],
+    'Vote': ['VoteBallot'], 'Tome@alleff': ['Tome_0'], 'Family@alleff': ['ClassIcons21'], 'Island shimmer@alleff': ['Island1'], 'Guild@alleff': ['Guild'], 'Friend@alleff': ['Friends'],
+    'Summoning@alleff': ['ClassIcons59'], 'Summoning': ['ClassIcons59'], 'Account bonus@alleff': ['HoopShop3'], 'Schematic@alleff': ['HoleUIbuildUpg49'], 'Chip@allbase': ['ConsoleChip8'], 'Chip@alleff': ['ConsoleChip11'],
+    'Card@alleff': ['PassiveCard'], 'Card': ['PassiveCard'], 'Card set@alleff': ['CardSet2'], 'Chaotic Troll card@alleff': ['2CardsZ11'], 'Gear': ['EquipmentHats123'], 'Gear@alleff': ['EquipmentHats123'],
+    'Obols': ['ObolHyper1'], 'Obols@alleff': ['ObolHyper1'], 'Kangaroo': ['RooA'], 'Fishing toolkit': ['FishTKweight13'], 'Achievement': ['TaskAchBorder1'], 'Copper set': ['Armor_Set_Smithy'],
+  };
+  const SKILL_ART = {
+    mining: { cls: 'ClassIcons42', mon: 'Bravery_Monument_x1', item: 'Copper', tool: 'EquipmentTools16' },
+    chopping: { cls: 'ClassIcons44', mon: 'Wisdom_Monument_x1', item: 'OakTree', tool: 'EquipmentToolsHatchet13' },
+    catching: { cls: 'ClassIcons47', mon: 'Justice_Monument_x1', item: 'Bug1', tool: 'CatchingNet13' },
+    fishing: { cls: 'ClassIcons45', mon: null, item: 'Fish1', tool: 'FishingRod13' },
   };
   const rowIcons = (r, skill) => {
     const k = r.key, s = SK_ICON[skill] || {};
@@ -671,6 +681,12 @@ const ICONS = /*__ICONS__*/;
     if (k === 'Golden food') return s.golden ? [s.golden] : [];
     if (k === 'Post office') return [s.box];
     if (k === 'Vial') return [s.vial];
+    const art = SKILL_ART[skill] || {};
+    if (k === 'Monument') return art.mon ? [art.mon] : [];
+    if (/ level$/.test(k) && !k.includes('@')) return [art.cls];
+    if (r.baseName === 'Base') return [art.item];
+    if (r.baseName === 'Tool' || /^(Pickaxe|Hatchet|Net|Fishing rod) \(/.test(r.baseName || '')) return [art.tool];
+    if (r.derived) return [art.tool];
     return ROW_ICONS[k] || ROW_ICONS[r.baseName] || [];
   };
   const LABEL_ICONS = {
@@ -1030,36 +1046,97 @@ const ICONS = /*__ICONS__*/;
     'Kangaroo': 'Kangaroo AFK gains bonus.', 'Vote': 'Bonus Ballot vote for AFK gains, while it is active.', 'Event Shop': 'Event shop AFK gains.', 'Vault': 'Upgrade Vault AFK gains.',
     'Bundle': 'Gem shop bundle.', 'Tesseract Map': 'Tesseract map bonus multiplier.',
   };
+  const AFK_ICONS = {
+    'Star sign': ['SignStar1b'], 'Trapping Bonus': ['TrapBoxSet1'], 'Bribe': ['BribeW'], 'Card': ['PassiveCard'], 'Family': ['ClassIcons25'], 'Guild': ['Guild'],
+    'Sleepin On The Job (VW Eclipse)': ['UISkillIcon79'], 'Sigil': ['aSiga16'], 'Chips': ['ConsoleChip8'], 'Prayers': ['Prayer4', 'Prayer12'], 'Tasks': ['TasksStar'], 'Arcade': ['PachiBall1'],
+    'Compass': ['CompassUpg9'], 'Void Set': ['Armor_Set_Smithy'], 'Dungeons': ['DungeonA7'], 'Divinity Major': ['DivGod0'], 'Divinity Minor': ['DivGod4'], 'Companion': ['beanG', 'Pet12'],
+    'Shrine': ['ConTowerB26'], 'Rando Event Looty': ['UISkillIcon650'], 'Summoning': ['ClassIcons59'], 'Golden Food': ['FoodG12'], 'Passive cards': ['PassiveCard'], 'Kangaroo': ['RooA'],
+    'Vote': ['VoteBallot'], 'Event Shop': ['Event_Currency'], 'Vault': ['VaultUpg23'], 'Bundle': ['PremiumGem'], 'Tesseract Map': ['ArcaneHelp'],
+    'Obols (AFK gains)': ['ObolHyper1'], 'Obols (Skill AFK gains)': ['ObolHyper1'], 'Obols': ['ObolHyper1'],
+  };
+  const PART_ICON = { trophies: 'GalleryPodiumA3', nametags: 'EquipmentNametag15', hatRack: 'HatHelpA', equipment: 'EquipmentHats123' };
+  const afkIcons = (r, skill) => {
+    if (r.part) return [PART_ICON[r.part]];
+    const n = r.name, art = SKILL_ART[skill] || {};
+    if (n === 'Base rate' || n === 'Base') return [art.item];
+    if (n === 'Talents') return ({ mining: ['UISkillIcon89'], chopping: ["UISkillIcon449"], catching: ['UISkillIcon298'], fishing: ['UISkillIcon89', 'UISkillIcon118'] }[skill] || []).concat(['UISkillIcon621']);
+    if (n === 'Bubble') return [{ mining: 'aUpgradesO17', fishing: 'aUpgradesO17', chopping: 'aUpgradesP17', catching: 'aUpgradesG17' }[skill]];
+    if (n === 'Post Office') return [SK_ICON[skill].box];
+    if (/^Gear/.test(n)) return ['EquipmentHats123'];
+    return AFK_ICONS[n] || [];
+  };
+  const AFK_STATS = { 'Equipment AFK multi': '%_AFK_GAINS_MULTI', 'Gear (AFK gains)': '%_ALL_AFK_GAIN', 'Gear (Skill AFK gains)': '%_SKILL_AFK_GAIN', 'Gear (Fishing AFK gains)': '%_FISH_AFK_GAIN', 'Gear (Catching AFK gains)': '%_CATCH_AFK_GAIN' };
+  const PARTS = [['trophies', 'Gallery trophies'], ['nametags', 'Gallery nametags'], ['hatRack', 'Hat rack'], ['equipment', 'Equipment']];
   const compareAfk = (skill, char) => {
     const mine = char.afk?.trees?.[skill]; if (!mine) return null;
     const base = evalTree(mine);
     const players = BENCH.skills[skill].players.filter((p) => p.afkLeaves);
-    const rows = leaves(mine).map((l) => {
-      const theirs = players.map((p) => ({ player: p.player, char: p.char, value: p.afkLeaves[l.path] }));
-      let best = null;
-      for (const th of theirs) { if (typeof th.value !== 'number') continue; th.gain = evalTree(withLeaves(mine, { [l.path]: th.value })) / base; if (!best || th.gain > best.gain) best = th; }
-      return { ...l, theirs, best, med: median(theirs.map((x) => x.value)), ignored: AFK_IGNORE.some((re) => re.test(l.name)) ? 'Loadout' : null };
-    });
+    const rows = [];
+    const deltas = {}, deltasFull = {};
+    for (const l of leaves(mine)) {
+      const stat = AFK_STATS[l.name];
+      const parts = stat && char.afk?.parts?.[stat];
+      if (!parts) {
+        const theirs = players.map((p) => ({ player: p.player, char: p.char, value: p.afkLeaves[l.path] }));
+        let best = null;
+        for (const th of theirs) { if (typeof th.value !== 'number') continue; th.gain = evalTree(withLeaves(mine, { [l.path]: th.value })) / base; if (!best || th.gain > best.gain) best = th; }
+        rows.push({ ...l, theirs, best, med: median(theirs.map((x) => x.value)), ignored: AFK_IGNORE.some((re) => re.test(l.name)) ? 'Loadout' : null });
+        continue;
+      }
+      // Split a gear AFK stat into gallery trophies, gallery nametags, hat rack and equipment.
+      const isMulti = l.name === 'Equipment AFK multi';
+      const totalOf = (v) => (typeof v !== 'number' ? null : isMulti ? (v - 1) * 100 : v);
+      const leafOf = (tot) => (isMulti ? 1 + tot / 100 : tot);
+      const split = (tot, pr) => ({ trophies: pr?.trophies || 0, nametags: pr?.nametags || 0, hatRack: pr?.hatRack || 0, equipment: tot - (pr?.trophies || 0) - (pr?.nametags || 0) - (pr?.hatRack || 0) });
+      const myTot = totalOf(l.value), my = split(myTot, parts);
+      for (const [part, label] of PARTS) {
+        const theirs = players.map((p) => { const tot = totalOf(p.afkLeaves[l.path]); return { player: p.player, char: p.char, value: tot == null || !p.afkParts ? null : split(tot, p.afkParts[stat])[part] }; });
+        let best = null;
+        for (const th of theirs) { if (typeof th.value !== 'number') continue; th.gain = evalTree(withLeaves(mine, { [l.path]: leafOf(myTot - my[part] + th.value) })) / base; if (!best || th.gain > best.gain) best = th; }
+        const ignored = part === 'equipment' ? 'Loadout' : null;
+        const row = { ...l, path: l.path + '#' + part, leafPath: l.path, part, stat, unit: 'percent', name: `${l.name === 'Equipment AFK multi' ? 'AFK gains multi' : l.name.replace(/^Gear \(|\)$/g, '')} · ${label}`, value: my[part], theirs, best, med: median(theirs.map((x) => x.value)), ignored };
+        rows.push(row);
+        if (best && best.gain > 1) { const d = best.value - my[part]; deltasFull[l.path] = (deltasFull[l.path] || 0) + d; if (!ignored) deltas[l.path] = (deltas[l.path] || 0) + d; }
+      }
+      deltas[l.path] = deltas[l.path] || 0; deltasFull[l.path] = deltasFull[l.path] || 0;
+      rows.leafFns = rows.leafFns || {}; rows.leafFns[l.path] = (d) => leafOf(myTot + d);
+    }
     const allMap = {}, fullMap = {};
-    rows.forEach((r) => { if (r.best && r.best.gain > 1) { fullMap[r.path] = r.best.value; if (!r.ignored) allMap[r.path] = r.best.value; } });
+    rows.forEach((r) => { if (r.part || !r.best || !(r.best.gain > 1)) return; fullMap[r.path] = r.best.value; if (!r.ignored) allMap[r.path] = r.best.value; });
+    for (const [p, f] of Object.entries(rows.leafFns || {})) { allMap[p] = f(deltas[p]); fullMap[p] = f(deltasFull[p]); }
     return { base, rows, allGain: evalTree(withLeaves(mine, allMap)) / base, fullGain: evalTree(withLeaves(mine, fullMap)) / base, players };
+  };
+  const galleryDetail = (r, char) => {
+    if (r.part !== 'trophies' && r.part !== 'nametags') return '';
+    const myItems = char.afk?.parts?.[r.stat]?.[r.part === 'trophies' ? 'trophyItems' : 'nametagItems'] || [];
+    const key = r.part === 'trophies' ? 'trophies' : 'nametags';
+    const mine = new Set(Object.values(char.afk?.parts || {}).flatMap((pp) => (pp?.[r.part === 'trophies' ? 'trophyItems' : 'nametagItems'] || []).map((x) => x.raw)));
+    const counts = {};
+    Object.values(BENCH.gallery || {}).forEach((g) => (g[key] || []).forEach((x) => { counts[x.raw] = (counts[x.raw] || 0) + 1; }));
+    const total = Object.keys(BENCH.gallery || {}).length;
+    const theirOnly = Object.entries(counts).filter(([raw]) => !mine.has(raw)).sort((a, b) => b[1] - a[1]);
+    const chip = (raw, sub) => `<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 10px 2px 0">${ic(raw, true)}<span class="src-ctx">${esc(sub)}</span></span>`;
+    return `<p class="dnote">Gallery items counted here are the ones placed on podiums (any AFK gains stat, not only this one, is listed for the top accounts).</p>
+      <div><strong>Yours</strong> (${esc(r.stat.replace(/_/g, ' ').replace('%', '').trim())}):<br>${myItems.length ? myItems.map((x) => chip(x.raw, `${pretty(x.name)} +${fmt(x.value)}%${x.podium ? ' · podium ' + x.podium : ''}`)).join('') : '<span class="src-ctx">none</span>'}</div>
+      ${theirOnly.length ? `<div><strong>Placed by top accounts but not by you</strong>:<br>${theirOnly.map(([raw, n]) => chip(raw, `${ICONS['n:' + raw] || raw} · ${n} of ${total} accounts`)).join('')}</div>` : ''}`;
   };
   const afkSection = (skill, char) => {
     const a = compareAfk(skill, char);
     if (!a) return '<section class="afk"><h2>AFK gains</h2><p class="lede">Import your save again to see the AFK gains comparison.</p></section>';
     const bestTop = a.players.reduce((x, p) => (p.afk > (x?.afk || 0) ? p : x), null);
-    const unitOf = (r) => (r.unit === 'multiplier' || /multi|Tesseract/i.test(r.name) ? '×' : '%');
+    const unitOf = (r) => (r.part ? '%' : r.unit === 'multiplier' || /multi|Tesseract/i.test(r.name) ? '×' : '%');
     const rowsSorted = a.rows.filter((r) => showIgnored || !r.ignored).filter((r) => showAhead || r.ignored || (r.best && r.best.gain > 1.0005)).sort((x, y) => (y.best?.gain || 0) - (x.best?.gain || 0));
     const maxLog = Math.max(...a.rows.filter((r) => !r.ignored && r.best).map((r) => Math.log(r.best.gain)), 0.01);
-    const desc = (r) => { const d = AFK_DESC[r.name]; return typeof d === 'object' ? d[skill] : d; };
+    const PART_DESC = { trophies: 'Trophies placed on gallery podiums. Higher podium levels multiply the bonus. Account-wide.', nametags: 'Nametags placed in the gallery. Account-wide.', hatRack: 'Premium hats in the hat rack. Account-wide.', equipment: 'Gear worn by this character (ignored in the ranking: it changes with the loadout).' };
+    const desc = (r) => { if (r.part) return PART_DESC[r.part]; const d = AFK_DESC[r.name]; return typeof d === 'object' ? d[skill] : d; };
     const row = (r) => {
       const key = 'afk' + r.path; const isOpen = openRows.has(skill + key); const u = unitOf(r);
       const g = r.best ? r.best.gain : NaN; const width = r.best && g > 1 ? Math.max(3, Math.round(100 * Math.log(g) / maxLog)) : 0;
       const st = r.ignored ? '<span class="pill ign">ignored · loadout</span>' : !r.best ? '<span class="pill even">no data</span>' : g > 1.005 ? '<span class="pill gap">gap</span>' : g < 0.9999 || r.theirs.every((t) => typeof t.value !== 'number' || t.value <= r.value + 1e-9) ? '<span class="pill ahead">at or above top</span>' : '<span class="pill even">level</span>';
-      let out = `<tr class="${r.ignored ? 'row-ign' : g > 1.005 ? '' : 'row-ahead'}"><td><button type="button" class="link" data-row="${esc(key)}" data-afk="1" aria-expanded="${isOpen}"><span class="chev" aria-hidden="true">${isOpen ? '▾' : '▸'}</span><span class="src-name">${esc(r.name)}</span></button><div class="src-ctx">${esc((r.ctx || []).join(' › ') || (u === '×' ? 'AFK gains multiplier' : 'AFK gains'))}</div></td>
+      let out = `<tr class="${r.ignored ? 'row-ign' : g > 1.005 ? '' : 'row-ahead'}"><td><button type="button" class="link" data-row="${esc(key)}" data-afk="1" aria-expanded="${isOpen}"><span class="chev" aria-hidden="true">${isOpen ? '▾' : '▸'}</span><span class="src-name">${afkIcons(r, skill).map((x) => ic(x)).join('')}${esc(r.name)}</span></button><div class="src-ctx">${esc((r.ctx || []).join(' › ') || (r.part ? (r.stat === '%_AFK_GAINS_MULTI' ? 'AFK gains multiplier' : 'AFK gains') : u === '×' ? 'AFK gains multiplier' : 'AFK gains'))}${r.part && r.part !== 'equipment' ? ' · account-wide' : ''}</div></td>
         <td class="num">${fmt(r.value)}${u}</td><td class="num">${fmt(r.med)}${u}</td><td class="num">${r.best ? fmt(r.best.value) + u + `<div class="who">${esc(r.best.player)}</div>` : '–'}</td>
         <td class="num"><div class="gain"><div class="bar" aria-hidden="true"><i style="width:${width}%"></i></div><span>${r.best ? fmtX(g) : '–'}</span></div></td><td>${st}</td></tr>`;
-      if (isOpen) out += `<tr class="detail"><td colspan="6"><div class="dwrap"><div class="dsec"><h3>${esc(r.name)}</h3>${desc(r) ? `<p class="dnote">${esc(desc(r))}</p>` : ''}</div><div class="dsec"><div class="scroll"><table class="minitable"><thead><tr><th>Player</th><th>Character</th><th class="num">Value</th><th class="num">Your AFK gains if matched</th></tr></thead><tbody>
+      if (isOpen) out += `<tr class="detail"><td colspan="6"><div class="dwrap"><div class="dsec"><h3>${afkIcons(r, skill).map((x) => ic(x, true)).join('')}${esc(r.name)}</h3>${desc(r) ? `<p class="dnote">${esc(desc(r))}</p>` : ''}${galleryDetail(r, char)}</div><div class="dsec"><div class="scroll"><table class="minitable"><thead><tr><th>Player</th><th>Character</th><th class="num">Value</th><th class="num">Your AFK gains if matched</th></tr></thead><tbody>
         <tr class="you"><td>You</td><td>${esc(char.name)}</td><td class="num">${fmt(r.value)}${u}</td><td class="num">1×</td></tr>
         ${r.theirs.map((t) => `<tr><td>${esc(t.player)}</td><td>${esc(t.char)}</td><td class="num">${fmt(t.value)}${u}</td><td class="num">${typeof t.gain === 'number' ? fmtX(t.gain) : '–'}</td></tr>`).join('')}</tbody></table></div></div></div></td></tr>`;
       return out;
@@ -1070,7 +1147,7 @@ const ICONS = /*__ICONS__*/;
         <div class="stat"><span class="eyebrow">Your AFK gains</span><span class="v">${fmt(a.base)}%</span><span class="s">${esc(char.name)}</span></div>
         <div class="stat"><span class="eyebrow">Best top sampler</span><span class="v">${bestTop ? fmt(bestTop.afk) + '%' : '–'}</span><span class="s">${bestTop ? esc(bestTop.player) + ' · ' + fmtX(bestTop.afk / a.base) + ' yours' : ''}</span></div>
         <div class="stat warn"><span class="eyebrow">Close every AFK gap</span><span class="v">${fmtX(a.allGain)}</span><span class="s">AFK gains, and the same factor on the sample</span></div>
-        <div class="stat"><span class="eyebrow">Including gear and obols</span><span class="v">${fmtX(a.fullGain)}</span><span class="s">if the loadout rows (gear, obols, cards, chips) matched too; tick "Show ignored sources" to see them</span></div>
+        <div class="stat"><span class="eyebrow">Including worn gear and obols</span><span class="v">${fmtX(a.fullGain)}</span><span class="s">if the loadout rows (gear, obols, cards, chips) matched too; tick "Show ignored sources" to see them</span></div>
       </div>
       <div class="sources"><div class="scroll"><table><thead><tr><th>AFK gains source</th><th class="num">You</th><th class="num">Top-5 median</th><th class="num">Best</th><th class="num">Gain if matched</th><th>Status</th></tr></thead>
       <tbody>${rowsSorted.map(row).join('')}</tbody></table></div></div></section>`;

@@ -154,13 +154,27 @@ export const superTalentPlan = (c, characters, account, skill, pi, loadout) => {
 
 // AFK gains for each skill, as if the character were AFK on that skill (the sample is 90% of AFK yield).
 const AFK_TYPE = { mining: 'MINING', chopping: 'CHOPPIN', catching: 'CATCHING', fishing: 'FISHING' };
+// AFK stats on gear also come from the gallery (trophies and nametags on podiums) and the hat rack, which are
+// account-wide. Split each one so the gallery part is not hidden inside "gear".
+export const AFK_STATS = { 'Equipment AFK multi': '%_AFK_GAINS_MULTI', 'Gear (AFK gains)': '%_ALL_AFK_GAIN', 'Gear (Skill AFK gains)': '%_SKILL_AFK_GAIN', 'Gear (Fishing AFK gains)': '%_FISH_AFK_GAIN', 'Gear (Catching AFK gains)': '%_CATCH_AFK_GAIN' };
+const afkParts = (c, account) => {
+  const pick = (list, name) => (list || []).find((x) => x?.name === name)?.value || 0;
+  const g = c?.gallery || account?.gallery || {};
+  const items = (list, name) => (list || []).filter((x) => x?.UQ1txt === name || x?.UQ2txt === name).map((x) => ({ raw: x.rawName, name: x.displayName, value: Number(x.UQ1txt === name ? x.UQ1val : x.UQ2val) || 0, podium: x.podiumLevel ?? null }));
+  return Object.fromEntries(Object.values(AFK_STATS).map((name) => [name, {
+    trophies: pick(g.trophyBonuses, name), nametags: pick(g.nametagBonuses, name), hatRack: pick(account?.hatRack?.hatBonuses, name),
+    trophyItems: items(account?.gallery?.trophiesUsed, name), nametagItems: items(account?.gallery?.nametagsUsed, name),
+    gearItems: (c?.equipment || []).concat(c?.tools || []).filter((x) => !['TROPHY', 'NAMETAG', 'PREMIUM_HELMET', 'REPLICA_TROPHY', 'REPLICA_NAMETAG'].includes(x?.Type)).filter((x) => x?.UQ1txt === name || x?.UQ2txt === name).map((x) => ({ raw: x.rawName, name: x.displayName, value: Number(x.UQ1txt === name ? x.UQ1val : x.UQ2val) || 0 })),
+  }]));
+};
 export const afkTrees = (c, characters, account) => {
   const trees = {}; const values = {};
   for (const s of SKILLS) {
     try { const r = getAfkGain({ ...c, afkType: AFK_TYPE[s] }, characters, account); trees[s] = cleanBreakdown(r?.breakdown); values[s] = r?.afkGains == null ? null : 100 * r.afkGains; }
     catch (e) { trees[s] = null; values[s] = null; }
   }
-  return { trees, values };
+  let parts = null; try { parts = afkParts(c, account); } catch (e) {}
+  return { trees, values, parts };
 };
 
 export const characterTrees = (c, characters, account) => {
