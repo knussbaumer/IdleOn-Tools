@@ -1,0 +1,423 @@
+<!-- tools-nav: shared menu, kept in sync by scripts/sync-nav.py -->
+<style>
+.tools-nav{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;padding:8px 16px;margin:0;background:#18211d;color:#e3e9e3;font:500 14px/1.3 "IBM Plex Sans","Segoe UI",system-ui,sans-serif}
+.tools-nav a{color:#c9d4cc;text-decoration:none;padding:5px 10px;border-radius:6px}
+.tools-nav a:hover{background:#2a3530;color:#fff}
+.tools-nav a.home{font-weight:700;color:#fff;margin-right:8px;letter-spacing:.01em}
+.tools-nav a[aria-current="page"]{background:#2f6f4a;color:#fff}
+.tools-nav a:focus-visible{outline:2px solid #7cc296;outline-offset:2px}
+</style>
+<nav class="tools-nav" aria-label="IdleOn Tools">
+  <a class="home" href="../">IdleOn Tools</a>
+  <a href="../sample-gap-finder/">Sample Gap Finder</a>
+  <a href="../stamp-planner/" aria-current="page">Stamp Upgrade Planner</a>
+</nav>
+<!-- /tools-nav -->
+<div class="wrap">
+<header>
+  <span class="eyebrow">World 1 · Stamps</span>
+  <h1>Stamp Upgrade Planner</h1>
+  <div class="import" aria-labelledby="impH">
+    <div class="row">
+      <strong id="impH">Your save</strong>
+      <span class="source"><span class="pill ok" id="sourcePill"></span></span>
+      <button type="button" class="btn ghost" id="changeBtn" aria-expanded="true" aria-controls="impBody" hidden>Import another save</button>
+      <button type="button" class="btn ghost" id="resetBtn" hidden>Back to built-in save</button>
+    </div>
+    <div id="impBody" class="impbody">
+    <div class="row">
+      <label class="btn filebtn" for="fileIn">Import JSON file<input type="file" id="fileIn" accept=".json,application/json,text/plain"></label>
+      <div class="drop" id="drop">or drop the IdleonToolbox export (.json) here</div>
+    </div>
+    <details class="paste" id="pasteBox">
+      <summary>Paste the file content instead</summary>
+      <textarea id="pasteIn" spellcheck="false" placeholder='{"data": {...}, "charNames": [...], "companion": {...}, ...}' aria-label="Save file content"></textarea>
+      <div class="row" style="margin-top:8px"><button type="button" class="btn" id="pasteBtn">Calculate</button></div>
+    </details>
+    </div>
+    <span class="status" id="status" role="status"></span>
+  </div>
+
+  <div class="empty" id="emptyState" hidden>
+    <strong>Import your save to start.</strong>
+    <span>Export your account from IdleonToolbox as JSON, then pick the file above, drop it in, or paste its content. Everything is calculated in your browser; the file is not uploaded anywhere.</span>
+  </div>
+  <div class="strip" id="factStrip">
+    <div class="fact h"><span class="k">Hydrogen</span><span class="v">+<span id="hPerDay"></span>% / day</span><span class="s">Atom level <span id="hLvl"></span>. Now at <span id="hNow"></span>% (day <span id="hDays"></span>). Cap 90%. Resets on every material upgrade.</span></div>
+    <div class="fact g"><span class="k">Gilded Stamps</span><span class="v"><span id="gOwned"></span> owned</span><span class="s">Each one takes 95% off one upgrade.</span></div>
+    <div class="fact x"><span class="k">Exalted Stamps</span><span class="v"><span id="xCount"></span> exalted</span><span class="s">Their bonus is multiplied by <span id="xMulti"></span> (Compass). Marked with a pink frame below.</span></div>
+    <div class="fact"><span class="k">Coins</span><span class="v" id="money"></span><span class="s">Biggest coins first, 100 of one coin make the next. Coin costs above this show in red.</span></div>
+    <div class="fact"><span class="k">No Stamp Left Behind</span><span class="v"><span id="nslb"></span> levels / day</span><span class="s">Free random levels. They also push stamps into higher-cost tiers over time.</span></div>
+    <div class="fact"><span class="k">Best carrier</span><span class="v" id="bestCarrier"></span><span class="s" id="bestCarrierSub"></span></div>
+  </div>
+</header>
+
+<div class="carry-hidden" id="carryHidden" hidden>
+  <span>All carry capacity stamps are out of reach.</span>
+  <button type="button" class="btn ghost" id="carryShowBtn">Show carry capacity stamps</button>
+</div>
+<section aria-labelledby="carryH" class="alert" id="carrySec" role="alert">
+  <div class="alert-head"><span class="alert-icon" aria-hidden="true">!</span><h2 id="carryH">Carry capacity stamps still upgradable: <span id="carryCount"></span></h2>
+    <label class="chk alert-toggle"><input type="checkbox" id="carryShowOOR"> Show out of reach</label></div>
+  <div class="tablebox"><table id="carryTable"><thead><tr>
+    <th>Stamp</th><th class="num">Level</th><th>Type</th><th>Material</th><th class="num">Cost (Gilded + 90%)</th><th class="num">In storage</th><th class="num">Time to farm</th><th class="num">Max carry</th><th>% to Max</th><th class="num">Tiers in reach</th><th class="num">Coins to next tier</th><th class="num">Coins to out of reach</th><th>Status</th>
+  </tr></thead><tbody></tbody></table></div>
+</section>
+
+<section aria-labelledby="planH" id="planSec">
+  <h2 id="planH">Upgrade planner</h2>
+  <div class="controls">
+    <div class="fitcounts" id="planSummary" role="group" aria-label="Reduction: number of stamps whose next tier fits in a character's inventory"></div>
+    <label class="chk"><input type="checkbox" id="fReach" checked> Hide out of reach</label>
+    <label class="chk"><input type="checkbox" id="fOwned"> Only if enough in storage</label>
+    <label class="chk"><input type="checkbox" id="fExalt"> Only exalted</label>
+    <input type="search" id="fText" placeholder="Filter stamp or material" aria-label="Filter stamp or material">
+  </div>
+  <div class="tablebox"><table id="planTable"><thead><tr>
+    <th class="sortable" data-k="n" tabindex="0">Stamp</th>
+    <th class="num sortable" data-k="l" tabindex="0">Level</th>
+    <th class="sortable" data-k="tl" tabindex="0">Type</th>
+    <th class="sortable" data-k="i" tabindex="0">Material</th>
+    <th class="num sortable" data-k="cost" tabindex="0">Cost</th>
+    <th class="num sortable" data-k="o" tabindex="0">In storage</th>
+    <th class="num">Time to farm</th>
+    <th class="num sortable" data-k="cap" tabindex="0">Max carry</th>
+    <th class="sortable" data-k="fill" tabindex="0">% to Max</th>
+    <th class="num sortable" data-k="rt" tabindex="0">Tiers in reach</th>
+    <th class="num sortable" data-k="gn" tabindex="0">Coins to next tier</th>
+    <th class="num sortable" data-k="gx" tabindex="0">Coins to out of reach</th>
+    <th>Status</th>
+  </tr></thead><tbody></tbody></table></div>
+</section>
+
+<section class="notes" aria-label="How this is calculated">
+  <h2 style="font-size:16px;color:var(--ink)">How this is calculated</h2>
+  <p>Material cost for the next tier = base cost × growth<sup>(tier − 1)<sup>0.8</sup></sup>, then × 0.05 with a Gilded Stamp, × (1 − Hydrogen%) and your vial and sigil discounts. Per-slot carry capacity is capped at 2.05B, and a character can hold the material across all inventory slots. "Max carry" is the best of your characters for that material type.</p>
+  <p>"Tiers in reach" counts how many more material upgrades fit, holding your current capacity fixed. In the carry capacity table it uses Gilded + 90%; in the planner it follows the reduction you picked. Gear stamps (bags, tools, armour) count items, and each takes a whole slot.</p>
+  <p>"Coins to next tier" is the coin cost of the levels between now and the next material upgrade: up to your current max level, or, if you're already at max, the levels the next material upgrade unlocks. "Coins to out of reach" adds up every coin level up to the last tier you can still carry; red means it is more than you have.</p>
+  <p>"In storage" is what sits in your storage chest. Many materials are at 1.05B, while upgrades here often need tens of billions, so storage is a second wall on top of carry capacity.</p>
+  <p>Importing runs the IdleonToolbox parser in your browser; the file never leaves this page. The last import is remembered in this browser only.</p>
+</section>
+</div>
+<script id="data" type="application/json">__DATA__</script>
+<script id="imgs" type="application/json">__IMGS__</script>
+<script>
+(function(){
+  const BUILTIN = JSON.parse(document.getElementById('data').textContent);
+  const IMG = JSON.parse(document.getElementById('imgs').textContent);
+  const LS_KEY = 'stampPlannerImport';
+  const $ = (id) => document.getElementById(id);
+  let D = BUILTIN;
+
+  const fmt = (x) => {
+    if (x == null || !isFinite(x)) return '–';
+    const a = Math.abs(x);
+    if (a < 1e3) return String(Math.round(x));
+    if (a >= 1e21) return x.toExponential(2).replace('e+','e');
+    const u = [[1e18,'Qn'],[1e15,'Q'],[1e12,'T'],[1e9,'B'],[1e6,'M'],[1e3,'K']];
+    for (const [v,s] of u) if (a >= v) return (x/v).toFixed(x/v >= 100 ? 0 : x/v >= 10 ? 1 : 2) + s;
+  };
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const who = (w) => esc((w || '').replace(/_/g,' '));
+  const icon = (raw, cls) => IMG[raw] ? `<img class="ico ${cls || ''}" src="${IMG[raw]}" alt="" loading="lazy">` : '';
+  // older built-in data lacks the material raw name; map it from the image key set when needed
+  const fillBar = (cost, cap) => {
+    const r = cost / cap; const w = Math.min(100, r * 100);
+    return `<div class="num" style="font-size:12px">${r > 9.99 ? '>999' : (r*100).toFixed(r < 0.01 ? 2 : 0)}%</div><div class="bar" aria-hidden="true"><i class="${r > 1 ? 'over' : ''}" style="width:${Math.max(w, r > 0 ? 1 : 0)}%"></i></div>`;
+  };
+  let PRI = new Set();
+  try { PRI = new Set(JSON.parse(localStorage.getItem('stampPlannerPriority') || '[]')); } catch (e) {}
+  const savePri = () => { try { localStorage.setItem('stampPlannerPriority', JSON.stringify([...PRI])); } catch (e) {} };
+  const flagBtn = (s) => { const on = PRI.has(s.r); return `<button type="button" class="flag${on ? ' on' : ''}" data-flag="${esc(s.r)}" aria-pressed="${on}" title="${on ? 'Remove from priorities' : 'Mark as priority'}" aria-label="${on ? 'Remove' : 'Mark'} ${esc(s.n)} ${on ? 'from' : 'as'} priority">${on ? '★' : '☆'}</button>`; };
+  const stampCell = (s) => `<div class="cell">${flagBtn(s)}${icon(s.r, s.x ? 'ex' : '')}<span><span class="name">${esc(s.n)}</span>${s.x ? '<span class="xbadge" title="Exalted stamp: its bonus is multiplied">Exalted</span>' : ''}<span class="sub">${esc(s.e)}</span></span></div>`;
+  const TYPES = {bCraft:'Material',bLog:'Logs',bLeaf:'Leaf',bOre:'Ore',bBar:'Bars',cOil:'Oil',dFish:'Fish',dBugs:'Bugs',dCritters:'Critters',dSouls:'Souls',cFood:'Food',dStone:'Upgrade Stone',dQuest:'Quest Item',dStatueStone:'Statue',dTimeCandy:'Misc'};
+  const typeLabel = (t) => !t ? '–' : (TYPES[t] || (t[0] === 'a' ? 'Gear' : t.replace(/^[a-z]/, '')));
+  const typeOf = (s) => s.mc || (s.rd ? 'Rare Drop' : typeLabel(s.t));
+  const typeCell = (s) => { const l = typeOf(s); return `<span class="type" data-t="${esc(l)}">${esc(l)}</span>`; };
+
+  // ---- farming rates (per material, kept in this browser) ----
+  // unit: what the rate is measured in; perHour converts "amount per unit" into hours (null = count kills instead)
+  const RATE_KINDS = {
+    'Spelunking Chapter': { ph: 'per hour', hoursPerUnit: 1 },
+    'Rare Drop': { ph: 'per 1h candy', hoursPerUnit: 1, unitWord: 'h of candy' },
+    'W7 Drop (no candy)': { ph: 'per 2 min', hoursPerUnit: 2 / 60 },
+    'Kill': { ph: 'per kill', hoursPerUnit: null },
+  };
+  const rateKind = (s) => s.ir === 'Quest17' ? RATE_KINDS.Kill : RATE_KINDS[typeOf(s)] || null;
+  let RATES = {};
+  try { RATES = JSON.parse(localStorage.getItem('stampPlannerRates') || '{}') || {}; } catch (e) {}
+  const saveRates = () => { try { localStorage.setItem('stampPlannerRates', JSON.stringify(RATES)); } catch (e) {} };
+  // Accepts 1500, 1,500, 2.5K, 1.2M, 3B, 4T (case-insensitive).
+  const parseAmount = (txt) => {
+    const m = String(txt ?? '').trim().replace(/[,'\s]/g, '').match(/^(\d+(?:\.\d+)?)([kmbt]?)$/i);
+    if (!m) return null;
+    const mult = { '': 1, k: 1e3, m: 1e6, b: 1e9, t: 1e12 }[m[2].toLowerCase()];
+    return parseFloat(m[1]) * mult;
+  };
+  const rateInput = (s) => {
+    const kind = rateKind(s);
+    if (!kind) return '';
+    const v = RATES[s.ir] ?? '';
+    const bad = v !== '' && !(parseAmount(v) > 0);
+    return `<input class="rate${bad ? ' bad' : ''}" type="text" inputmode="decimal" data-ir="${esc(s.ir)}" value="${esc(v)}" placeholder="${kind.ph}" aria-label="${esc(s.i)} ${kind.ph}" title="${kind.ph}, e.g. 1.5M or 2B">`;
+  };
+  const fmtHours = (h) => {
+    if (!isFinite(h)) return '–';
+    if (h < 1) return `${Math.max(1, Math.round(h * 60))} min`;
+    if (h < 48) return `${h.toFixed(h < 10 ? 1 : 0)} h`;
+    return `${fmt(Math.round(h))} h<span class="sub">${(h / 24).toFixed(h / 24 < 100 ? 1 : 0)} days</span>`;
+  };
+  const farmTime = (need, rate, kind) => {
+    if (need <= 0) return '<span class="pill ok">Have enough</span>';
+    if (!(rate > 0)) return '<span class="muted">enter rate</span>';
+    const units = need / rate;
+    return kind.hoursPerUnit == null ? `${fmt(Math.ceil(units))} kills` : fmtHours(units * kind.hoursPerUnit);
+  };
+  const farmCell = (r, k) => {
+    const kind = rateKind(r);
+    if (!kind) return '<td class="num"><span class="muted">–</span></td>';
+    const rate = parseAmount(RATES[r.ir]);
+    const fits = r.fill <= 1;
+    const next = fits ? farmTime(r.cost - r.o, rate, kind) : '<span class="muted">out of reach</span>';
+    const maxNeed = r.mr ? r.mr[k] : 0;
+    const toMax = maxNeed > 0 ? farmTime(maxNeed - r.o, rate, kind) : null;
+    return `<td class="num farm">${rateInput(r)}<span class="sub">next tier</span>${next}${toMax ? `<span class="sub">to max (${fmt(maxNeed)})</span>${toMax}` : ''}</td>`;
+  };
+  const money = () => (D.meta && D.meta.money) || 0;
+  // Same split as IdleonToolbox getCoinsArray: 100 of each coin make the next, coin 25 is the top one.
+  const coinsArray = (v) => {
+    if (!isFinite(v) || v < 1) return [[1, 0]];
+    let n = BigInt(Math.floor(v)).toString();
+    const out = [];
+    let i = 1;
+    while (n.length > 0 && i < 25) {
+      if (n.length < 2) { out.push([i, Number(n)]); n = ''; break; }
+      out.push([i, Number(n.slice(-2))]); n = n.slice(0, -2); i++;
+    }
+    if (n.length > 0) out.push([25, Number(n)]);
+    return out.reverse();
+  };
+  const coinsHtml = (v, max = 2) => {
+    const arr = coinsArray(v);
+    const shown = [];
+    for (let j = 0; j < arr.length && shown.length < max; j++) {
+      const [idx, q] = arr[j];
+      if (j > 0 && q === 0) continue;
+      const qty = j === 0 && q >= 10000 ? fmt(q) : String(q);
+      shown.push(`<span class="coin" title="Coin ${idx}">${IMG['Coins' + idx] ? `<img src="${IMG['Coins' + idx]}" alt="Coin ${idx}">` : ''}${qty}</span>`);
+    }
+    return `<span class="coins">${shown.join('')}</span>`;
+  };
+  const coin = (v) => v == null ? '–' : `<span class="${v > money() ? 'short' : ''}">${coinsHtml(v)}</span>`;
+  const coinCells = (gn, nt, gx, rl) => `<td class="num">${coin(gn)}${nt ? `<span class="sub">to Lv ${nt}</span>` : ''}</td><td class="num">${gx == null ? '–' : (gx === 0 ? '<span class="muted">–</span><span class="sub">nothing in reach</span>' : coin(gx) + `<span class="sub">to Lv ${rl}</span>`)}</td>`;
+  const matCell = (s) => `<div class="cell">${icon(s.ir, 'sm')}<span>${esc(s.i)}${s.q ? '<span class="sub">gear, 1 per slot</span>' : ''}</span></div>`;
+
+  function renderHeader(){
+    const h = D.meta.h;
+    $('hPerDay').textContent = h.level * h.baseBonus;
+    $('hLvl').textContent = h.level;
+    $('hNow').textContent = h.value;
+    $('hDays').textContent = h.days;
+    $('gOwned').textContent = D.meta.gilded;
+    $('nslb').textContent = D.meta.nslb;
+    $('money').innerHTML = D.meta.money != null ? coinsHtml(D.meta.money, 3) : 'import a save';
+    $('xCount').textContent = D.stamps.filter(s => s.x).length;
+    $('xMulti').textContent = D.meta.exaltedMulti != null ? '×' + (1 + D.meta.exaltedMulti / 100).toFixed(2) : 'the Compass bonus';
+    const mats = D.stamps.filter(s => !s.q);
+    const maxCap = Math.max(...mats.map(s => s.cap));
+    const top = mats.find(s => s.cap === maxCap);
+    $('bestCarrier').textContent = fmt(maxCap);
+    $('bestCarrierSub').textContent = `${top ? top.w.replace(/_/g,' ') : ''}, ${D.meta.slots || 97} slots. Other material types top out lower.`;
+    $('sourcePill').textContent = D.meta.save || 'Imported save';
+    $('resetBtn').hidden = D === BUILTIN;
+    $('resetBtn').textContent = BUILTIN ? 'Back to built-in save' : 'Clear imported save';
+  }
+
+  function renderCarry(){
+    // Alert: only carry capacity stamps that still fit with Gilded + 90%; hidden entirely when none do.
+    // "Show out of reach" also lists the ones that no longer fit, and keeps the alert visible when none do.
+    const all = D.stamps.filter(s => s.cy);
+    const inReach = all.filter(s => s.cs.g90 <= s.cap);
+    const showOOR = $('carryShowOOR').checked;
+    const carry = (showOOR ? all : inReach).sort((a,b) => (a.cs.g90/a.cap) - (b.cs.g90/b.cap));
+    const hide = !showOOR && inReach.length === 0;
+    $('carrySec').hidden = hide;
+    $('carryHidden').hidden = !hide || all.length === 0;
+    $('carryCount').textContent = `${inReach.length} of ${all.length}`;
+    // Same columns as the planner, always with Gilded + 90%.
+    $('carryTable').querySelector('tbody').innerHTML = carry.map(s => rowHtml(prepRow(s, 'g90'), 'g90')).join('');
+  }
+
+  // Shared row building for the carry alert and the planner.
+  const prepRow = (s, k) => { const rt = s.rr ? s.rr[k] : s.rg; return {...s, tl: typeOf(s), cost: s.cs[k], fill: s.cs[k] / s.cap, rt, gx: s.gr ? s.gr[k] : null, rl: Math.max(s.l, s.m) + rt * s.k}; };
+  const rowHtml = (r, k) => {
+    const fits = r.fill <= 1, own = r.q || r.o >= r.cost;
+    let pill;
+    if (!fits) pill = r.rg > 0 ? `<span class="pill warn">Needs more reduction</span>` : `<span class="pill bad">Out of reach</span>`;
+    else if (r.q) pill = `<span class="pill gold">Craft gear</span>`;
+    else if (!own) pill = `<span class="pill warn">Farm material</span>`;
+    else pill = `<span class="pill ok">Ready</span>`;
+    return `<tr${PRI.has(r.r) ? ' class="pri"' : ''}><td>${stampCell(r)}</td>
+      <td class="num">${r.l}<span class="sub">+${r.k} per tier</span></td>
+      <td>${typeCell(r)}</td>
+      <td>${matCell(r)}</td>
+      <td class="num">${fmt(r.cost)}</td>
+      <td class="num">${r.q ? '–' : fmt(r.o)}${!r.q && r.o < r.cost ? `<span class="sub">short ${fmt(r.cost - r.o)}</span>` : ''}</td>
+      ${farmCell(r, k)}
+      <td class="num">${fmt(r.cap)}<span class="sub">${who(r.w)}</span></td>
+      <td>${fillBar(r.cost, r.cap)}</td>
+      <td class="num">${r.rt}</td>${coinCells(r.gn, r.nt, r.gx, r.rl)}<td>${pill}</td></tr>`;
+  };
+
+  // Hydrogen reduction always comes with a Gilded Stamp, so only these four cases exist.
+  const SCEN_KEYS = ['now', 'g', 'g70', 'g90'];
+  let sk = 'g70', sortK = 'fill', sortDir = 1;
+  try { const st = JSON.parse(localStorage.getItem('stampPlanner') || '{}'); if (SCEN_KEYS.includes(st.sk)) sk = st.sk; } catch (e) {}
+  const scenKey = () => sk;
+  function renderPlan(){
+    try { localStorage.setItem('stampPlanner', JSON.stringify({sk})); } catch (e) {}
+    const k = scenKey();
+    const q = $('fText').value.trim().toLowerCase();
+    let rows = D.stamps.map(s => prepRow(s, k));
+    const total = rows.length;
+    const reach = rows.filter(r => r.fill <= 1);
+    const ownedOk = reach.filter(r => r.q || r.o >= r.cost);
+    if (q) rows = rows.filter(r => (r.n + ' ' + r.i).toLowerCase().includes(q));
+    // Priorities always show at the top, even when the reach / storage filters would hide them.
+    const cmp = (a,b) => { const x = a[sortK], y = b[sortK]; return (typeof x === 'string' ? x.localeCompare(y) : x - y) * sortDir; };
+    const pri = rows.filter(r => PRI.has(r.r)).sort(cmp);
+    let rest = rows.filter(r => !PRI.has(r.r));
+    if ($('fReach').checked) rest = rest.filter(r => r.fill <= 1);
+    if ($('fOwned').checked) rest = rest.filter(r => r.q || r.o >= r.cost);
+    if ($('fExalt').checked) rest = rest.filter(r => r.x);
+    rest.sort(cmp);
+    // Next-tier fits per scenario (current tier only).
+    const fitCount = (key) => D.stamps.filter(s => s.cs[key] <= s.cap).length;
+    const scen = [['now', '0%', false], ['g', '0%', true], ['g70', '70%', true], ['g90', '90%', true]];
+    $('planSummary').innerHTML = scen.map(([key, h, g]) =>
+      `<button type="button" class="fc${g ? ' gold' : ''}" data-k="${key}" aria-pressed="${key === k}" aria-label="${fitCount(key)} with Hydrogen ${h}${g ? ' and a Gilded Stamp' : ', no Gilded Stamp'}"><b>${fitCount(key)}</b><span class="lbl-st">Stamps</span><span class="fci">${h}<img class="atom" src="${IMG.Particle}" alt=""></span>${g ? `<span class="fci">+<img class="gs" src="${IMG.GildedStamp}" alt=""></span>` : ''}</button>`).join('');
+    const groupRow = (t) => `<tr class="group"><td colspan="13">${t}</td></tr>`;
+    let html = '';
+    if (pri.length) html += groupRow('★ Priorities') + pri.map(r => rowHtml(r, k)).join('') + (rest.length ? groupRow('Other stamps') : '');
+    html += rest.map(r => rowHtml(r, k)).join('');
+    $('planTable').querySelector('tbody').innerHTML = html || `<tr><td colspan="13" class="muted">No stamps match these settings.</td></tr>`;
+    document.querySelectorAll('#planTable th.sortable').forEach(th => {
+      th.textContent = th.textContent.replace(/ [▲▼]$/, '') + (th.dataset.k === sortK ? (sortDir > 0 ? ' ▲' : ' ▼') : '');
+    });
+  }
+  const TYPE_BY_ITEM = Object.fromEntries((BUILTIN?.stamps || []).map(s => [s.ir, s.t]));
+  const EX_BY_STAMP = Object.fromEntries((BUILTIN?.stamps || []).map(s => [s.r, !!s.x]));
+  document.addEventListener('change', (e) => {
+    const inp = e.target.closest && e.target.closest('input.rate');
+    if (!inp) return;
+    const v = inp.value.trim();
+    if (v) RATES[inp.dataset.ir] = v; else delete RATES[inp.dataset.ir];
+    saveRates();
+    renderCarry(); renderPlan();
+  });
+  // Save while typing too, so a rate is kept even if the page is closed before leaving the box.
+  document.addEventListener('input', (e) => {
+    const inp = e.target.closest && e.target.closest('input.rate');
+    if (!inp) return;
+    const v = inp.value.trim();
+    if (v) RATES[inp.dataset.ir] = v; else delete RATES[inp.dataset.ir];
+    saveRates();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches && e.target.matches('input.rate')) e.target.blur(); });
+  try { $('carryShowOOR').checked = localStorage.getItem('stampPlannerCarryOOR') === '1'; } catch (e) {}
+  const setCarryOOR = (on) => {
+    $('carryShowOOR').checked = on;
+    try { localStorage.setItem('stampPlannerCarryOOR', on ? '1' : '0'); } catch (e) {}
+    renderCarry();
+  };
+  $('carryShowOOR').addEventListener('change', (e) => setCarryOOR(e.target.checked));
+  $('carryShowBtn').addEventListener('click', () => setCarryOOR(true));
+  const renderAll = () => {
+    const has = !!(D && D.stamps);
+    $('emptyState').hidden = has;
+    ['factStrip','planSec'].forEach(id => $(id).hidden = !has);
+    if (!has) { $('carrySec').hidden = true; $('carryHidden').hidden = true; $('sourcePill').textContent = 'No save loaded'; $('resetBtn').hidden = true; return; }
+    D.stamps.forEach(s => { if (s.t == null) s.t = TYPE_BY_ITEM[s.ir] || ''; if (s.x == null) s.x = !!EX_BY_STAMP[s.r]; }); renderHeader(); renderCarry(); renderPlan(); };
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-flag]');
+    if (!b) return;
+    const raw = b.dataset.flag;
+    if (PRI.has(raw)) PRI.delete(raw); else PRI.add(raw);
+    savePri();
+    renderCarry(); renderPlan();
+  });
+
+  // ---- import ----
+  const setStatus = (msg, cls) => { const el = $('status'); el.textContent = msg; el.className = 'status' + (cls ? ' ' + cls : ''); };
+  let enginePromise = null;
+  const loadEngine = () => enginePromise ??= new Promise((res, rej) => {
+    if (window.StampEngine) return res(window.StampEngine);
+    const s = document.createElement('script');
+    s.src = 'engine.js';
+    s.onload = () => window.StampEngine ? res(window.StampEngine) : rej(new Error('The calculator did not load. Reload the page and try again.'));
+    s.onerror = () => { enginePromise = null; rej(new Error('The calculator did not load. Check your connection and try again.')); };
+    document.head.appendChild(s);
+  });
+  const busy = (on) => ['pasteBtn','fileIn'].forEach(id => $(id).disabled = on);
+
+  // Import panel collapses once a save is loaded; "Import another save" opens it again.
+  const setImportOpen = (open) => {
+    $('impBody').hidden = !open;
+    $('changeBtn').hidden = open || !(D && D.stamps);
+    $('changeBtn').setAttribute('aria-expanded', String(open));
+  };
+  $('changeBtn').addEventListener('click', () => { setImportOpen(true); $('status').textContent = ''; });
+  async function importText(text, label){
+    if (!text || !text.trim()) { setStatus('The file is empty. Pick the JSON export from IdleonToolbox.', 'err'); return; }
+    busy(true);
+    setStatus('Loading the calculator…');
+    try {
+      const engine = await loadEngine();
+      setStatus('Calculating stamp costs and carry capacity… this takes a few seconds.');
+      await new Promise(r => setTimeout(r, 30));
+      let parsed;
+      try { parsed = JSON.parse(text); } catch (e) { throw new Error('This is not valid JSON. Paste the whole file content, from the first { to the last }.'); }
+      const result = engine.compute(parsed);
+      const stamp = new Date().toLocaleString('de-CH', {dateStyle: 'short', timeStyle: 'short'});
+      result.meta.save = `${label} · imported ${stamp}`;
+      D = result;
+      try { localStorage.setItem(LS_KEY, JSON.stringify(result)); } catch (e) {}
+      renderAll();
+      setStatus(`Updated from ${label}: ${result.stamps.length} stamps, ${result.meta.chars} characters.`, 'ok');
+      setImportOpen(false);
+    } catch (e) {
+      setStatus(e.message || String(e), 'err');
+    } finally { busy(false); }
+  }
+  const readFile = (file) => {
+    if (!file) return;
+    const fr = new FileReader();
+    fr.onload = () => importText(String(fr.result), file.name);
+    fr.onerror = () => setStatus('Could not read that file. Try pasting its content instead.', 'err');
+    fr.readAsText(file);
+  };
+  $('fileIn').addEventListener('change', e => { readFile(e.target.files[0]); e.target.value = ''; });
+  const drop = $('drop');
+  ['dragenter','dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave','drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e => readFile(e.dataTransfer.files[0]));
+  $('pasteBtn').addEventListener('click', () => importText($('pasteIn').value, 'pasted save'));
+  $('resetBtn').addEventListener('click', () => {
+    D = BUILTIN; try { localStorage.removeItem(LS_KEY); } catch (e) {}
+    renderAll(); setImportOpen(!(D && D.stamps)); setStatus(BUILTIN ? 'Showing the built-in save again.' : 'Imported save cleared.');
+  });
+
+  $('planSummary').addEventListener('click', (e) => { const btn = e.target.closest('button[data-k]'); if (btn) { sk = btn.dataset.k; renderPlan(); } });
+  ['fReach','fOwned','fExalt'].forEach(id => $(id).addEventListener('change', renderPlan));
+  $('fText').addEventListener('input', renderPlan);
+  document.querySelectorAll('#planTable th.sortable').forEach(th => {
+    const go = () => { if (sortK === th.dataset.k) sortDir *= -1; else { sortK = th.dataset.k; sortDir = 1; } renderPlan(); };
+    th.addEventListener('click', go);
+    th.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+  });
+
+  try { const saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); if (saved && saved.stamps && saved.meta) D = saved; } catch (e) {}
+  renderAll();
+  setImportOpen(!(D && D.stamps));
+})();
+</script>

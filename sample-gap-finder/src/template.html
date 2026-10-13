@@ -1,0 +1,1018 @@
+<title>Sample Gap Finder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one working column — import strip, skill tabs, summary of top samplers, then the ranked source table with drill-downs. */
+:root {
+  --bg: #f3f5f1;
+  --surface: #ffffff;
+  --sunk: #e8ece5;
+  --fg: #1c231f;
+  --muted: #5d6a62;
+  --line: #d5dcd3;
+  --accent: #2f6f4a;
+  --accent-soft: #dcebe0;
+  --gap: #a3530f;
+  --gap-soft: #f6e6d4;
+  --ahead: #2f6f4a;
+  --ahead-soft: #e1efe4;
+  --ignored: #8a9690;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121714; --surface: #19201c; --sunk: #222b25; --fg: #e3e9e3; --muted: #9aa89f; --line: #2f3a33;
+    --accent: #7cc296; --accent-soft: #23382b; --gap: #f0a35c; --gap-soft: #3a2a1a; --ahead: #7cc296; --ahead-soft: #1f3327; --ignored: #6f7c75;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121714; --surface: #19201c; --sunk: #222b25; --fg: #e3e9e3; --muted: #9aa89f; --line: #2f3a33;
+  --accent: #7cc296; --accent-soft: #23382b; --gap: #f0a35c; --gap-soft: #3a2a1a; --ahead: #7cc296; --ahead-soft: #1f3327; --ignored: #6f7c75;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.5; padding: 24px 16px 48px; }
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 22px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(1.7rem, 4vw, 2.4rem); font-weight: 800; letter-spacing: -0.01em; }
+h2 { font-size: 1.25rem; font-weight: 600; }
+h3 { font-size: 1.02rem; font-weight: 600; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 70ch; }
+.eyebrow { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+header.top { display: grid; gap: 8px; }
+
+.import { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.import .status { min-width: 0; }
+.import .status strong { font-weight: 600; }
+.import .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.import.drag { outline: 2px dashed var(--accent); outline-offset: 3px; }
+button, .btn { font: inherit; font-weight: 500; border-radius: 7px; border: 1px solid var(--line); background: var(--sunk); color: var(--fg); padding: 7px 13px; cursor: pointer; }
+button:hover, .btn:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+textarea { width: 100%; min-height: 90px; font-family: var(--font-mono); font-size: 12px; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 7px; padding: 8px; }
+.paste { grid-column: 1 / -1; display: grid; gap: 8px; }
+.err { color: var(--gap); font-weight: 500; }
+
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+.tab { border: 1px solid transparent; border-bottom: none; background: none; border-radius: 8px 8px 0 0; padding: 10px 14px 9px; color: var(--muted); display: grid; gap: 0; text-align: left; }
+.tab .t1 { font-family: var(--font-display); font-weight: 600; font-size: 1.05rem; color: inherit; }
+.tab .t2 { font-size: 0.78rem; }
+.tab[aria-selected="true"] { background: var(--surface); border-color: var(--line); color: var(--fg); margin-bottom: -1px; }
+.tab[aria-selected="true"] .t1 { color: var(--accent); }
+
+.panel { display: grid; gap: 20px; }
+.controls { display: flex; gap: 14px 22px; flex-wrap: wrap; align-items: end; }
+.field { display: grid; gap: 4px; }
+.field label { font-size: 0.78rem; color: var(--muted); font-weight: 500; }
+select { font: inherit; padding: 6px 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); max-width: 100%; }
+.check { display: flex; gap: 8px; align-items: center; font-size: 0.9rem; }
+
+.versus { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.versus .scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th { text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; background: var(--surface); }
+td { padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+td.num, th.num { text-align: right; white-space: nowrap; }
+tr.you td { background: var(--accent-soft); font-weight: 500; }
+
+.headline { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 2px; min-width: 0; }
+.stat .v { font-family: var(--font-mono); font-size: 1.35rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+.stat .s { color: var(--muted); font-size: 0.82rem; }
+.stat.warn .v { color: var(--gap); }
+
+.top5 { display: grid; gap: 8px; }
+.top5 ol { margin: 0; padding-left: 1.4em; display: grid; gap: 4px; }
+.top5 li::marker { font-family: var(--font-mono); color: var(--muted); }
+
+.sources { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.sources .scroll { overflow-x: auto; }
+.sources table { min-width: 760px; }
+.src-name { font-weight: 500; }
+.src-ctx { font-size: 0.76rem; color: var(--muted); }
+.gain { display: grid; grid-template-columns: 64px 70px; gap: 8px; align-items: center; justify-content: end; }
+.bar { height: 7px; border-radius: 4px; background: var(--sunk); overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--gap); }
+.pill { display: inline-block; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.03em; border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.pill.gap { background: var(--gap-soft); color: var(--gap); }
+.pill.ahead { background: var(--ahead-soft); color: var(--ahead); }
+.pill.even { background: var(--sunk); color: var(--muted); }
+.pill.ign { background: var(--sunk); color: var(--ignored); }
+tr.row-ahead td { color: var(--muted); }
+tr.row-ign td { color: var(--ignored); }
+tr.detail td { background: var(--sunk); font-size: 0.85rem; }
+.who { font-size: 0.76rem; color: var(--muted); }
+button.link { border: none; background: none; padding: 0; color: var(--accent); font-weight: 500; cursor: pointer; text-align: left; }
+.minitable td, .minitable th { padding: 4px 10px; border-bottom: 1px solid var(--line); }
+.minitable { width: auto; }
+
+
+/* Best-in-slot setups: one small table per slot group, laid side by side */
+.bis-wrap { display: grid; gap: 14px; }
+.bis-head { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; }
+.bis-boards { display: grid; gap: 16px; }
+.setup { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; min-width: 0; }
+.setup h3 { font-size: 1.05rem; }
+.setup-groups { display: flex; flex-wrap: nowrap; gap: 10px; align-items: flex-start; overflow-x: auto; padding-bottom: 4px; }
+.sg { flex: 0 0 auto; }
+.sg { display: grid; gap: 4px; justify-items: start; }
+.sg .cap { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; }
+table.slots { border-collapse: separate; border-spacing: 3px; width: auto; background: var(--sunk); border-radius: 8px; padding: 2px; }
+table.slots td { width: 42px; height: 42px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); text-align: center; vertical-align: middle; }
+table.slots td.empty { background: transparent; border-style: dashed; }
+table.slots td.set { width: 54px; }
+table.slots td.cd { height: 58px; }
+.slot { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border: 0; padding: 3px; background: none; cursor: help; border-radius: 5px; }
+.slot img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; image-rendering: pixelated; image-rendering: crisp-edges; }
+td.cd .slot img { width: 34px; height: 50px; object-fit: contain; }
+td.set .slot img { width: 46px; height: 104px; object-fit: contain; }
+td:not(.cd):not(.set) > .slot img { width: 32px; height: 32px; }
+.slot:hover, .slot:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.spots .slot { width: 40px; height: 40px; display: inline-flex; }
+.spots td { vertical-align: middle; }
+.spots td.ic { width: 52px; padding: 4px 6px; }
+.credit { color: var(--muted); font-size: 0.84rem; font-style: italic; }
+.bis-tip { position: fixed; z-index: 50; max-width: 320px; background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; box-shadow: 0 8px 24px rgba(0,0,0,.18); font-size: 0.85rem; display: grid; gap: 4px; pointer-events: none; }
+.bis-tip .t { font-family: var(--font-display); font-weight: 600; font-size: 0.98rem; }
+.bis-tip .ty { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: .05em; }
+.bis-tip .sv { font-weight: 600; color: var(--accent); }
+.bis-tip ul { margin: 2px 0 0; padding-left: 1.1em; display: grid; gap: 2px; }
+
+.dwrap { display: grid; gap: 16px; padding-block: 6px; }
+.dsec { display: grid; gap: 8px; min-width: 0; }
+.dsec h3 { font-size: 0.95rem; }
+.dnote { color: var(--muted); font-size: 0.84rem; max-width: 90ch; }
+td.sub { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; padding-top: 10px; }
+tr.hl td { font-weight: 600; }
+.chev { display: inline-block; width: 1.1em; color: var(--muted); }
+.btnrow { display: flex; gap: 8px; }
+.minitable .pill { margin-left: 4px; }
+.drill { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; min-width: 0; }
+.card .scroll { overflow-x: auto; }
+.card p { color: var(--muted); font-size: 0.88rem; }
+
+img.ic { width: 22px; height: 22px; object-fit: contain; vertical-align: middle; image-rendering: pixelated; margin-right: 6px; }
+img.ic.lg { width: 30px; height: 30px; }
+.src-name img.ic { margin-right: 6px; }
+tr.section td { background: var(--sunk); font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; padding: 10px 12px; }
+tr.section td .src-ctx { font-family: var(--font-body); font-weight: 400; }
+.callout { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 8px 12px; border-radius: 0 8px 8px 0; font-size: 0.88rem; max-width: 90ch; }
+.callout.warn { border-color: var(--gap); background: var(--gap-soft); }
+details.more > summary { cursor: pointer; color: var(--accent); font-weight: 500; font-size: 0.88rem; }
+.notes { color: var(--muted); font-size: 0.85rem; display: grid; gap: 6px; max-width: 80ch; }
+.notes strong { color: var(--fg); font-weight: 600; }
+
+@media (max-width: 640px) {
+  .import { grid-template-columns: 1fr; }
+  .import .actions { justify-content: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<!-- tools-nav: shared menu, kept in sync by scripts/sync-nav.py -->
+<style>
+.tools-nav{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;padding:8px 16px;margin:-24px -16px 18px;background:#18211d;color:#e3e9e3;font:500 14px/1.3 "IBM Plex Sans","Segoe UI",system-ui,sans-serif}
+.tools-nav a{color:#c9d4cc;text-decoration:none;padding:5px 10px;border-radius:6px}
+.tools-nav a:hover{background:#2a3530;color:#fff}
+.tools-nav a.home{font-weight:700;color:#fff;margin-right:8px;letter-spacing:.01em}
+.tools-nav a[aria-current="page"]{background:#2f6f4a;color:#fff}
+.tools-nav a:focus-visible{outline:2px solid #7cc296;outline-offset:2px}
+</style>
+<nav class="tools-nav" aria-label="IdleOn Tools">
+  <a class="home" href="../">IdleOn Tools</a>
+  <a href="../sample-gap-finder/" aria-current="page">Sample Gap Finder</a>
+  <a href="../stamp-planner/">Stamp Upgrade Planner</a>
+</nav>
+<!-- /tools-nav -->
+<div class="wrap">
+  <header class="top">
+    <span class="eyebrow">Legends of Idleon · 3D Printer samples</span>
+    <h1>Sample Gap Finder</h1>
+    <p class="lede">Every source of skill efficiency for your sampling character, next to the five best public samplers on the IdleonToolbox leaderboard. Rows are ranked by how much your efficiency would rise if that one source matched the best of them. Gear, cards, card sets, lab chips, obols, armor-set bonuses and tools are set aside, because they change with your loadout.</p>
+  </header>
+
+  <section class="import" id="importBox" aria-label="Import save">
+    <div class="status" id="importStatus">Loading…</div>
+    <div class="actions">
+      <label class="btn" for="fileInput">Import save file</label>
+      <input type="file" id="fileInput" accept=".json,application/json" hidden>
+      <button type="button" id="pasteToggle">Paste JSON</button>
+    </div>
+    <div class="paste" id="pasteBox" hidden>
+      <textarea id="pasteArea" placeholder="Paste the save JSON you copied from Idleon Toolbox or the Steam/web save export"></textarea>
+      <div><button type="button" class="primary" id="pasteGo">Analyze pasted save</button></div>
+    </div>
+  </section>
+
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+  <main class="panel" id="panel"></main>
+
+  <section class="notes" aria-label="How to read this">
+    <span class="eyebrow">How to read this</span>
+    <p><strong>Gain ×</strong> is your total efficiency with that single source raised to the best top sampler's value, divided by your efficiency today. Sources that sit in the same additive group share one multiplier, so their gains do not simply multiply together.</p>
+    <p><strong>Efficiency is not yield.</strong> In the game's fishing formula, items per action grow with efficiency to the power of about 0.35 once prowess is capped at 0.1, so 10× efficiency gives about 2.2× items. Mining, chopping and catching very likely work the same way, but that is not verified.</p>
+    <p><strong>Top samplers</strong> are the characters holding each account's best Copper, Oak Log, Fly and Goldfish sample, read from their public IdleonToolbox profiles on <span id="benchDate"></span>. Their character-specific values (talent levels, skill level, stats, star sign, prayers) are from their current loadout, which may not be the one they sampled with.</p>
+    <p>Calculations are IdleonToolbox's own parser, bundled into this page (GPL-3.0, github.com/Morta1/IdleonToolbox). Your save is processed in your browser and is not uploaded anywhere.</p>
+  </section>
+</div>
+
+<script>
+/*__BUNDLE__*/
+</script>
+<script>
+const BENCH = /*__BENCH__*/;
+const PRELOADED = /*__KIM__*/;
+const DET = /*__DET__*/;
+const BINP = /*__INP__*/;
+const BIS = /*__BIS__*/;
+const ICONS = /*__ICONS__*/;
+</script>
+<script>
+(() => {
+  const SKILL_META = {
+    mining: { tab: 'Mining', sub: 'Copper · Warriors', item: 'Copper', family: ['Warrior', 'Barbarian', 'Squire', 'Blood_Berserker', 'Death_Bringer', 'Divine_Knight', 'Royal_Guardian'], monument: 'Bravery Monument', monumentBonus: 'Mining Efficiency' },
+    chopping: { tab: 'Logs', sub: 'Oak Logs · Mages', item: 'Oak Log', family: ['Mage', 'Wizard', 'Shaman', 'Elemental_Sorcerer', 'Bubonic_Conjuror', 'Arcane_Cultist'], monument: 'Wisdom Monument', monumentBonus: 'Choppin Efficiency' },
+    catching: { tab: 'Catching', sub: 'Flies · Siege Breakers', item: 'Fly', family: ['Siege_Breaker'], monument: 'Justice Monument', monumentBonus: 'Catching Efficiency' },
+    fishing: { tab: 'Fishing', sub: 'Goldfish · Blood Berserkers', item: 'Goldfish', family: ['Barbarian', 'Blood_Berserker', 'Death_Bringer'] },
+  };
+  const SKILL_ORDER = ['mining', 'chopping', 'catching', 'fishing'];
+  const STORE_KEY = 'sample-gap-finder:analysis:v4';
+  const IGNORE = [
+    { re: /^Gear$/, why: 'Gear' },
+    { re: /^Obols$/, why: 'Obols' },
+    { re: /^Card$/, why: 'Cards' },
+    { re: /^Card set$/, why: 'Card set' },
+    { re: /^Chaotic Troll card$/, why: 'Cards' },
+    { re: /^Chip$/, why: 'Lab chips' },
+    { re: /set$/, why: 'Armor set' },
+    { re: /^Tool$/, why: 'Tools' },
+    { re: /^(Pickaxe|Hatchet|Net|Fishing rod) \(/, why: 'Tools' },
+  ];
+  const ignoreReason = (name) => { for (const r of IGNORE) if (r.re.test(name)) return r.why; return null; };
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const pretty = (s) => String(s ?? '').replace(/_/g, ' ');
+
+  const fmt = (v) => {
+    if (v === null || v === undefined || Number.isNaN(v)) return '–';
+    const a = Math.abs(v);
+    if (a === 0) return '0';
+    if (Number.isInteger(v) && a < 1e6) return v.toLocaleString('en-US');
+    if (a >= 1e6) return v.toExponential(2).replace('e+', 'e');
+    if (a >= 1000) return Math.round(v).toLocaleString('en-US');
+    if (a >= 100) return v.toFixed(1);
+    if (a >= 10) return v.toFixed(2);
+    return v.toFixed(3).replace(/\.?0+$/, '') || '0';
+  };
+  const fmtX = (r) => {
+    if (!isFinite(r)) return '–';
+    if (r >= 100) return r.toExponential(1).replace('e+', 'e') + '×';
+    if (r >= 10) return r.toFixed(1) + '×';
+    return r.toFixed(r >= 1.995 ? 2 : 3) + '×';
+  };
+  const unitLabel = (u) => (u === 'percent' ? '%' : u === 'multiplier' ? '×' : '');
+
+  // Tree helpers ----------------------------------------------------------
+  const leaves = (tree) => {
+    const out = [];
+    const walk = (n, path, ctx) => {
+      if (n.children && n.children.length) {
+        const label = n.name ? n.name : null;
+        n.children.forEach((c, i) => walk(c, path + '/' + i, label ? ctx.concat(label) : ctx));
+      } else out.push({ path, name: n.name, value: n.value, unit: n.unit, ctx });
+    };
+    tree.tree.forEach((n, i) => walk(n, String(i), []));
+    return out;
+  };
+  const withLeaves = (tree, map) => {
+    const walk = (n, path) => {
+      if (n.children && n.children.length) return { ...n, children: n.children.map((c, i) => walk(c, path + '/' + i)) };
+      return path in map ? { ...n, value: map[path] } : n;
+    };
+    return { ...tree, tree: tree.tree.map((n, i) => walk(n, String(i))) };
+  };
+  const evalTree = (tree) => { try { return KimGap.evaluateTree(tree); } catch (e) { return NaN; } };
+  const median = (arr) => { const a = arr.filter((x) => typeof x === 'number').sort((x, y) => x - y); if (!a.length) return NaN; const m = Math.floor(a.length / 2); return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
+
+  // State -----------------------------------------------------------------
+  let analysis = null;
+  let source = '';
+  let current = 'mining';
+  const charChoice = {};
+  let showIgnored = false;
+  let showAhead = true;
+  const openRows = new Set();
+
+  try { const h = (location.hash || '').replace('#', ''); if (SKILL_ORDER.includes(h)) current = h; } catch (e) {}
+
+  const setStatus = (html) => { $('importStatus').innerHTML = html; };
+  const describeSource = () => {
+    if (!analysis) return '<span class="err">No save loaded yet.</span> Import your save JSON to see your gaps.';
+    const when = analysis.lastUpdated ? new Date(analysis.lastUpdated).toLocaleString('de-CH', { dateStyle: 'medium', timeStyle: 'short' }) : 'unknown time';
+    return `<span class="eyebrow">Showing</span><br><strong>${esc(source)}</strong> · save from ${esc(when)} · ${analysis.chars.length} characters`;
+  };
+
+  const loadAnalysis = (a, label, persist) => {
+    analysis = a; source = label;
+    for (const k of Object.keys(charChoice)) delete charChoice[k];
+    openRows.clear();
+    if (persist) { try { localStorage.setItem(STORE_KEY, JSON.stringify({ a, label })); } catch (e) {} }
+    setStatus(describeSource());
+    render();
+  };
+
+  const analyzeRaw = (text, label) => {
+    setStatus('Reading the save… this takes a couple of seconds.');
+    setTimeout(() => {
+      try {
+        const raw = JSON.parse(text);
+        if (!raw || !(raw.data || raw.charNames)) throw new Error('This JSON does not look like an Idleon save. It should have "data" and "charNames" at the top.');
+        const a = KimGap.analyzeSave(raw);
+        if (!a.chars.length) throw new Error('No characters were found in this save.');
+        loadAnalysis(a, label, true);
+      } catch (e) {
+        setStatus(`<span class="err">Could not read that save.</span> ${esc(e.message || e)} ${analysis ? '<br>Still showing the previous save.' : ''}`);
+      }
+    }, 30);
+  };
+
+  // Import wiring -------------------------------------------------------------
+  $('fileInput').addEventListener('change', (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => analyzeRaw(String(r.result), f.name);
+    r.onerror = () => setStatus('<span class="err">The file could not be read.</span> Try exporting it again.');
+    r.readAsText(f);
+    ev.target.value = '';
+  });
+  $('pasteToggle').addEventListener('click', () => { $('pasteBox').hidden = !$('pasteBox').hidden; if (!$('pasteBox').hidden) $('pasteArea').focus(); });
+  $('pasteGo').addEventListener('click', () => { const t = $('pasteArea').value.trim(); if (!t) { setStatus('<span class="err">The paste box is empty.</span> Paste your save JSON first.'); return; } analyzeRaw(t, 'Pasted save'); $('pasteArea').value = ''; $('pasteBox').hidden = true; });
+  const box = $('importBox');
+  ['dragenter', 'dragover'].forEach((t) => box.addEventListener(t, (e) => { e.preventDefault(); box.classList.add('drag'); }));
+  ['dragleave', 'drop'].forEach((t) => box.addEventListener(t, (e) => { e.preventDefault(); box.classList.remove('drag'); }));
+  box.addEventListener('drop', (e) => { const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => analyzeRaw(String(r.result), f.name); r.readAsText(f); });
+
+  // Tabs --------------------------------------------------------------------
+  const renderTabs = () => {
+    $('tabs').innerHTML = SKILL_ORDER.map((s) => `<button type="button" class="tab" role="tab" id="tab-${s}" aria-selected="${s === current}" data-skill="${s}"><span class="t1">${SKILL_META[s].tab}</span><span class="t2">${SKILL_META[s].sub}</span></button>`).join('');
+    $('tabs').querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => { current = b.dataset.skill; openRows.clear(); try { history.replaceState(null, '', '#' + current); } catch (e) {} render(); }));
+  };
+
+  // Core comparison -----------------------------------------------------------
+  const pickDefaultChar = (skill) => {
+    const best = analysis.samples?.[skill]?.char;
+    if (best && analysis.chars.some((c) => c.name === best && c.trees[skill])) return best;
+    const fam = analysis.chars.filter((c) => SKILL_META[skill].family.includes(c.cls) && c.trees[skill]);
+    const pool = fam.length ? fam : analysis.chars.filter((c) => c.trees[skill]);
+    pool.sort((a, b) => (b.values[skill] || 0) - (a.values[skill] || 0));
+    return pool[0]?.name;
+  };
+
+  // The skill-power multiplier is 1 + (sum of the power sources + achievement) / 100, so it moves
+  // with the power sources. substitute() keeps it in step when a power source changes.
+  const powerLink = (tree) => {
+    let group = null, mult = null;
+    const walk = (n, path) => {
+      if (n.children && n.children.length) {
+        if (/ power$/.test(n.name || '') && !group) group = { path, name: n.name, kids: n.children.map((c, i) => ({ path: path + '/' + i, value: c.value })) };
+        n.children.forEach((c, i) => walk(c, path + '/' + i));
+      }
+    };
+    tree.tree.forEach((n, i) => walk(n, String(i)));
+    if (!group) return null;
+    const leaf = leaves(tree).find((l) => l.name === group.name);
+    if (leaf) mult = { path: leaf.path, value: leaf.value };
+    return mult ? { group, mult } : null;
+  };
+  const substitute = (tree, map, link) => {
+    const m = { ...map };
+    if (link && !(link.mult.path in m)) {
+      let delta = 0;
+      for (const k of link.group.kids) if (k.path in m) delta += m[k.path] - k.value;
+      if (delta) m[link.mult.path] = link.mult.value + delta / 100;
+    }
+    return evalTree(withLeaves(tree, m));
+  };
+  const STAT_NAMES = ['Strength', 'Agility', 'Wisdom', 'Luck'];
+  const rowKey = (u) => {
+    if (STAT_NAMES.includes(u.name)) return u.name;
+    const ctx = u.ctx || [];
+    if (ctx.includes('Base efficiency for all skills')) return u.name + '@allbase';
+    if (ctx.includes('All skill efficiency')) return u.name + '@alleff';
+    return u.name;
+  };
+
+  const compare = (skill, char) => {
+    const mine = char.trees[skill];
+    const base = evalTree(mine);
+    const link = powerLink(mine);
+    const players = BENCH.skills[skill].players;
+    const all = leaves(mine);
+    // Units: one row per source; a main stat appears twice in the formula and is compared as one row.
+    const units = [];
+    const seenStat = {};
+    for (const l of all) {
+      if (STAT_NAMES.includes(l.name)) {
+        if (seenStat[l.name]) { seenStat[l.name].parts.push(l); continue; }
+        const u = { ...l, parts: [l], stat: true };
+        seenStat[l.name] = u; units.push(u); continue;
+      }
+      units.push({ ...l, parts: [l] });
+    }
+    const rows = units.map((u) => {
+      const display = u.parts[u.parts.length - 1];
+      const derived = link && u.parts.length === 1 && u.path === link.mult.path;
+      const theirs = players.map((p) => {
+        const map = {}; u.parts.forEach((x) => { map[x.path] = p.leaves[x.path]; });
+        const ok = u.parts.every((x) => typeof p.leaves[x.path] === 'number');
+        return { player: p.player, char: p.char, value: p.leaves[display.path], map: ok ? map : null };
+      });
+      let best = null;
+      for (const t of theirs) {
+        if (!t.map) continue;
+        const g = substitute(mine, t.map, derived ? null : link) / base;
+        t.gain = g;
+        if (!best || g > best.gain) best = { ...t, gain: g };
+      }
+      const med = median(theirs.map((t) => t.value));
+      return { ...u, baseName: u.name, key: rowKey(u), name: u.stat ? u.name + ' (base + multiplier)' : u.name, value: display.value, unit: display.unit, theirs, best, med,
+        derived, ignored: ignoreReason(u.name), statNote: u.stat };
+    });
+    for (let i = rows.length - 1; i >= 0; i--) if (/^Maestro Transfusion/.test(rows[i].baseName)) rows.splice(i, 1);
+    const allMap = {};
+    rows.forEach((r) => { if (!r.ignored && !r.derived && r.best && r.best.gain > 1) Object.assign(allMap, r.best.map); });
+    const allGain = substitute(mine, allMap, link) / base;
+    return { base, rows, allGain, link };
+  };
+
+  const ctxLabel = (ctx, skill) => {
+    const names = ctx.filter(Boolean);
+    if (!names.length) return 'Efficiency multiplier';
+    return names.join(' › ');
+  };
+
+  const sectionOf = (r) => {
+    const ctx = r.ctx || [];
+    if (r.statNote) return 'skill';
+    if (r.derived || ctx.some((c) => / power$/.test(c))) return 'power';
+    if (r.baseName === 'Post office') return 'post';
+    if (ctx.includes('All skill efficiency')) return 'all';
+    if (r.baseName === 'Base' || ctx.some((c) => /^Base /.test(c))) return 'base';
+    return 'skill';
+  };
+  const status = (r) => {
+    if (r.ignored) return `<span class="pill ign">ignored · ${esc(r.ignored)}</span>`;
+    if (r.derived) return '<span class="pill even">follows power sources</span>';
+    if (!r.best) return '<span class="pill even">no data</span>';
+    if (r.best.gain > 1.005) return '<span class="pill gap">gap</span>';
+    if (r.best.gain < 0.9999 || (r.best.gain <= 1.005 && r.theirs.every((t) => typeof t.value !== 'number' || t.value <= r.value + 1e-9))) return '<span class="pill ahead">at or above top</span>';
+    return '<span class="pill even">level</span>';
+  };
+
+  // Detail panels ------------------------------------------------------------
+  const MON_FALLBACK = {
+    mining: ['Mining Efficiency', 'x Bucket Fill Rate', 'x Cooking Speed', 'EXP Gain for Villagers', 'x Gaming Bits Gain', 'Chance for Bravery Opals', 'DMG for all Characters', 'x Bell Ring & Ping Rate', 'All Monument AFK Gain', 'x Bravery Bonuses Multi'],
+    catching: ['Catching Efficiency', 'x Harp Note Gain', 'x Artifact Find Chance', 'EXP Gain for Villagers', 'x All Summoning Essence Gain', 'Chance for Justice Opals', 'Class EXP Gain', 'more daily Lamp Wishes', 'All Monument AFK Gain', 'x Justice Bonuses Multi'],
+    chopping: ['Choppin Efficiency', 'x Jar Rupie Value', 'x Jade Coin Gain', 'EXP Gain for Villagers', 'x Farming Crop Evo Chance', 'Chance for Wisdom Opals', 'Player Drop Rate', 'Gambit Points', 'All Monument AFK Gain', 'x Wisdom Bonuses Multi'],
+  };
+  const benchPlayers = (skill) => BENCH.skills[skill].players.map((p) => ({ name: p.player, d: DET[p.player] || null }));
+  const myDetails = (skill) => analysis.details?.[skill] || null;
+  const needReimport = '<p class="lede">This detail needs a fresh import of your save.</p>';
+  const ratioCell = (mine, theirs) => {
+    if (typeof mine !== 'number' || typeof theirs !== 'number' || !mine) return '';
+    const r = theirs / mine;
+    const cls = r > 1.005 ? 'gap' : r < 0.995 ? 'ahead' : 'even';
+    return ` <span class="pill ${cls}">${fmtX(r)}</span>`;
+  };
+  const headRow = (skill, first) => `<tr><th>${esc(first)}</th><th class="num">You</th>${benchPlayers(skill).map((p) => `<th class="num">${esc(p.name)}</th>`).join('')}</tr>`;
+  const compRow = (label, mineVal, theirVals, opts = {}) => {
+    const f = opts.f || fmt;
+    return `<tr${opts.hl ? ' class="hl"' : ''}><td>${label}</td><td class="num">${mineVal === null || mineVal === undefined ? '–' : f(mineVal)}</td>${theirVals.map((v) => `<td class="num">${v === null || v === undefined ? '–' : f(v)}${opts.ratio === false ? '' : ratioCell(mineVal, v)}</td>`).join('')}</tr>`;
+  };
+  const yesNo = (v) => (v ? 'yes' : 'no');
+
+  const monumentDetail = (skill) => {
+    const me = myDetails(skill)?.monument; if (!me) return needReimport;
+    const bp = benchPlayers(skill);
+    const names = me.rows?.map((r) => r.name) || MON_FALLBACK[skill];
+    const cosmoOf = (m) => (m && m.multi ? ((m.multi / (1 + (m.fountain || 0) / 100)) - 1 - (m.i9 || 0) / 100) * 100 : null);
+    return `<h3>${esc(me.name)}: every bonus</h3>
+      <p class="dnote">Bonus levels come from the chest rewards you pick after each run. The first bonus is the efficiency line: +2% per level, uncapped, times the monument multiplier. The multiplier is (1 + bonus 10 + Cosmo) × the Fountain bonus.</p>
+      <div class="scroll"><table class="minitable"><thead>${headRow(skill, 'Bonus levels')}</thead><tbody>
+      ${[0, 9].map((i) => compRow(esc(names[i]), me.rows?.[i]?.level ?? null, bp.map((p) => p.d?.mon?.[skill]?.levels?.[i] ?? null), { hl: i === 0 })).join('')}
+      <tr><td colspan="${2 + bp.length}" class="sub">Monument multiplier</td></tr>
+      ${compRow('Total multiplier', me.multi, bp.map((p) => p.d?.mon?.[skill]?.multi ?? null), { f: (v) => fmt(v) + '×' })}
+      ${compRow('Bonus 10 (Bonuses Multi)', me.multiBonusPct, bp.map((p) => p.d?.mon?.[skill]?.i9 ?? null), { f: (v) => fmt(v) + '%' })}
+      ${compRow('Fountain', me.fountainPct, bp.map((p) => p.d?.mon?.[skill]?.fountain ?? null), { f: (v) => fmt(v) + '%' })}
+      ${compRow('Cosmo', me.cosmoPct, bp.map((p) => cosmoOf(p.d?.mon?.[skill])), { f: (v) => fmt(v) + '%' })}
+      ${compRow('Sum of all bonus levels', me.rows?.reduce((a, r) => a + (r.level || 0), 0) ?? null, bp.map((p) => p.d?.mon?.[skill]?.levels?.reduce((a, b) => a + b, 0) ?? null))}
+      ${compRow('Share in the efficiency bonus', me.rows ? 100 * me.rows[0].level / Math.max(1, me.rows.reduce((a, r) => a + (r.level || 0), 0)) : null, bp.map((p) => { const l = p.d?.mon?.[skill]?.levels; return l ? 100 * l[0] / Math.max(1, l.reduce((a, b) => a + b, 0)) : null; }), { f: (v) => v.toFixed(1) + '%', ratio: false })}
+      </tbody></table></div>
+      <details class="more"><summary>Other ${esc(me.name)} bonuses (no effect on ${esc(SK_ICON[skill].label.toLowerCase())} efficiency)</summary>
+      <div class="scroll"><table class="minitable"><thead>${headRow(skill, 'Bonus levels')}</thead><tbody>
+      ${names.map((n, i) => (i === 0 || i === 9 ? '' : compRow(esc(n), me.rows?.[i]?.level ?? null, bp.map((p) => p.d?.mon?.[skill]?.levels?.[i] ?? null)))).join('')}
+      </tbody></table></div></details>`;
+  };
+
+  const statueDetail = (skill, char) => {
+    const me = myDetails(skill)?.statue; if (!me) return needReimport;
+    const bp = benchPlayers(skill);
+    const s = me.statue, dr = me.dragon;
+    const myVal = char.statueVal?.[skill] ?? s.value;
+    const ps = bp.map((p) => p.d?.statue?.[skill] || null);
+    const pd = bp.map((p) => p.d?.dragon || null);
+    const zm = me.zenithMarket || {}, vu = me.vault || {}, vo = me.voodoo || {};
+    return `<h3>${ic(SK_ICON[skill].statue, true)}${esc(pretty(s.name))} statue and the Dragon statue ${ic('StatueZ30', true)}</h3>
+      <p class="dnote">Statue power = level × per-level bonus × Onyx × Zenith × Dragon multiplier × upgrade vault × Voodoo Statufication talent × event shop. It feeds skill power, which counts twice in efficiency. The Dragon statue multiplies every other statue, so its level matters as much as this statue's.</p>
+      <div class="scroll"><table class="minitable"><thead>${headRow(skill, pretty(s.name) + ' statue')}</thead><tbody>
+      ${compRow('Level', s.level, ps.map((x) => x?.level ?? null), { hl: true })}
+      ${compRow('Onyx', s.onyx ? 1 : 0, ps.map((x) => (x ? (x.onyx ? 1 : 0) : null)), { f: yesNo, ratio: false })}
+      ${compRow('Zenith multiplier', s.zenith ? s.zenithMulti : null, ps.map((x) => (x?.zenith ? x.zenithMulti : null)), { f: (v) => fmt(v) + '×' })}
+      ${compRow(`<span class="src-ctx">Zenith Market: True Zen level${zm.max ? ' (max ' + zm.max + ')' : ''}</span>`, zm.level ?? null, bp.map((p) => p.d?.zen ?? null))}
+      ${vu.applies ? compRow('Upgrade Vault multiplier', s.vault, ps.map((x) => x?.vault ?? null), { f: (v) => fmt(v) + '×' }) + compRow(`<span class="src-ctx">Upgrade Vault: Statue Bonanza level${vu.max ? ' (max ' + vu.max + ')' : ''}</span>`, vu.level ?? null, bp.map((p) => p.d?.vaultLv ?? null)) : `<tr><td colspan="${2 + bp.length}" class="src-ctx">Statue Bonanza in the Upgrade Vault only boosts the Power, Speed, Mining and Lumberbob statues, so it does nothing here.</td></tr>`}
+      ${compRow(`${ic('UISkillIcon56')}Voodoo Statufication (Vman Talent)`, s.talentMulti, ps.map((x) => x?.talentMulti ?? null), { f: (v) => fmt(v) + '×' })}
+      ${compRow(`<span class="src-ctx">Talent level${vo.char ? ', highest on ' + esc(vo.char) : ''}</span>`, vo.level ?? null, bp.map((p) => p.d?.voodoo ?? null))}
+      ${compRow('Statue power (this character)', myVal, ps.map((x) => x?.value ?? null), { hl: true })}
+      <tr><td colspan="${2 + bp.length}" class="sub">Dragon statue</td></tr>
+      ${compRow('Level', dr.level, pd.map((x) => x?.level ?? null), { hl: true })}
+      ${compRow('Onyx', dr.onyx ? 1 : 0, pd.map((x) => (x ? (x.onyx ? 1 : 0) : null)), { f: yesNo, ratio: false })}
+      ${compRow('Zenith multiplier', dr.zenith ? dr.zenithMulti : null, pd.map((x) => (x?.zenith ? x.zenithMulti : null)), { f: (v) => fmt(v) + '×' })}
+      ${compRow('Dragon bonus', dr.value, pd.map((x) => x?.value ?? null), { f: (v) => fmt(v) + '%' })}
+      ${compRow('Multiplier on all statues', s.dragonMulti, pd.map((x) => x?.multi ?? null), { f: (v) => fmt(v) + '×', hl: true })}
+      </tbody></table></div>`;
+  };
+
+  const VIAL_STAT_LABEL = { '6SkillEff': 'all skill efficiency', MinEff: 'mining efficiency', ChopEff: 'choppin efficiency', CatchEff: 'catching efficiency', FishEff: 'fishing efficiency' };
+  const vialDetail = (skill) => {
+    const me = myDetails(skill)?.vials; if (!me) return needReimport;
+    const bp = benchPlayers(skill);
+    const part = (name) => me.parts?.find((x) => x.name === name)?.value ?? null;
+    const myParts = [part('My First Chemistry Set (Lab)'), part('Vial Mastery (Rift)'), part('Upgrade Vault'), part('Meritocracy (Vote Ballot)')];
+    const wanted = me.list.map((v) => v.name);
+    return `<h3>Vials</h3>
+      <p class="dnote">A vial's bonus is its level bonus times the account vial multiplier: My First Chemistry Set × (1 + Vial Mastery + upgrade vault) × Meritocracy. Vial Mastery in the Rift gives +2% for every vial at the max level 13, so your total vial levels count for every vial, not only these two.</p>
+      <div class="scroll"><table class="minitable"><thead>${headRow(skill, 'Vial (level · bonus)')}</thead><tbody>
+      ${me.list.map((v) => compRow(`${ic(v.mainItem)}${esc(pretty(v.name))}<div class="src-ctx">${esc(VIAL_STAT_LABEL[v.stat] || v.stat)}</div>`, v.value, bp.map((p) => p.d?.vials?.find((x) => x.name === v.name)?.value ?? null), { f: (x) => fmt(x) + '%' })
+        + compRow('<span class="src-ctx">level</span>', v.level, bp.map((p) => p.d?.vials?.find((x) => x.name === v.name)?.level ?? null), { ratio: false })).join('')}
+      <tr><td colspan="${2 + bp.length}" class="sub">Vial multiplier</td></tr>
+      ${compRow('Total vial multiplier', me.multiplier, bp.map((p) => p.d?.vialMulti ?? null), { f: (v) => fmt(v) + '×', hl: true })}
+      ${compRow('My First Chemistry Set (Lab)', myParts[0], bp.map((p) => p.d?.vialParts?.[0] ?? null), { f: (v) => fmt(v) + '×' })}
+      ${compRow('Vial Mastery (Rift)', myParts[1], bp.map((p) => p.d?.vialParts?.[1] ?? null), { f: (v) => fmt(v) + '%' })}
+      ${compRow('Upgrade Vault', myParts[2], bp.map((p) => p.d?.vialParts?.[2] ?? null), { f: (v) => fmt(v) + '%' })}
+      ${compRow('Meritocracy (Vote Ballot)', myParts[3], bp.map((p) => p.d?.vialParts?.[3] ?? null), { f: (v) => fmt(v) + '×' })}
+      ${compRow('Vials at max level', me.maxed, bp.map((p) => p.d?.vialTotals?.maxed ?? null), { f: (v) => `${v} / ${me.count}` })}
+      ${compRow('Total vial levels', me.totalLevels, bp.map((p) => p.d?.vialTotals?.total ?? null))}
+      </tbody></table></div>
+      ${(() => {
+        const levelOf = (list, name) => { const x = (list || []).find((v) => v.name === name); return x ? x.level : 13; };
+        const names = [];
+        (me.notMaxed || []).forEach((v) => names.includes(v.name) || names.push(v.name));
+        bp.forEach((p) => (p.d?.notMaxed || []).forEach((v) => names.includes(v.name) || names.push(v.name)));
+        if (!me.notMaxed) return '';
+        const behind = names.filter((n) => bp.some((p) => p.d && levelOf(p.d.notMaxed, n) > levelOf(me.notMaxed, n)));
+        return `<h3>Vials below level 13</h3>
+          <p class="dnote">Every vial you raise to 13 adds 2% to the vial multiplier. ${behind.length ? 'Marked rows are vials where at least one top sampler is higher than you: ' + behind.map((n) => esc(pretty(n))).join(', ') + '.' : 'No top sampler has a vial higher than yours.'}</p>
+          <div class="scroll"><table class="minitable"><thead>${headRow(skill, 'Vial level')}</thead><tbody>
+          ${names.map((n) => { const mine = levelOf(me.notMaxed, n); return `<tr${behind.includes(n) ? ' class="hl"' : ''}><td>${esc(pretty(n))}</td><td class="num">${mine}</td>${bp.map((p) => { const v = p.d ? levelOf(p.d.notMaxed, n) : null; return `<td class="num">${v === null ? '–' : v}${v !== null && v > mine ? ' <span class="pill gap">+' + (v - mine) + '</span>' : ''}</td>`; }).join('')}</tr>`; }).join('')}
+          </tbody></table></div>`;
+      })()}`;
+  };
+
+  const mealDetail = (skill) => {
+    const me = myDetails(skill)?.meals; if (!me) return needReimport;
+    const bp = benchPlayers(skill);
+    const pm = (p, name) => p.d?.meals?.find((m) => m.name === name) || null;
+    const partNames = [];
+    me.list.forEach((m) => m.parts.forEach((x) => { const n = x.name.replace(/\(Rank \d+\)|\(Lv\. \d+\)/, '').trim(); if (x.d === 0 && n && !partNames.includes(n)) partNames.push(n); }));
+    const partVal = (m, n) => { const x = m.parts.find((y) => y.d === 0 && y.name.replace(/\(Rank \d+\)|\(Lv\. \d+\)/, '').trim() === n); return x ? x.value : null; };
+    return `<h3>Skill efficiency meals</h3>
+      <p class="dnote">Each meal gives level × per-level bonus, times the all-meal bonuses (Black Diamond Rhinestone, shiny pets), the Summoning winner bonus, the Wickerlight companion, its ribbon and its Cooking Mastery yellow node. Your meal max level is ${me.maxLevel ?? '–'}.</p>
+      <div class="scroll"><table class="minitable"><thead>${headRow(skill, 'Meal')}</thead><tbody>
+      ${me.list.map((m) => `<tr><td colspan="${2 + bp.length}" class="sub">${ic(m.rawName)}${esc(pretty(m.name))}</td></tr>`
+        + compRow('Bonus', m.value, bp.map((p) => pm(p, m.name)?.value ?? null), { f: (v) => fmt(v) + '%', hl: true })
+        + compRow('Meal level', m.level, bp.map((p) => pm(p, m.name)?.level ?? null))
+        + compRow('Ribbon rank', m.ribbonRank, bp.map((p) => pm(p, m.name)?.ribbon ?? null))
+        + compRow('Yellow node level', m.nodeLevel, bp.map((p) => pm(p, m.name)?.node ?? null))).join('')}
+      <tr><td colspan="${2 + bp.length}" class="sub">Cooking Mastery</td></tr>
+      ${compRow('Mastery level', me.mastery?.level ?? null, bp.map((p) => p.d?.mastery?.level ?? null))}
+      ${compRow('Yellow points spent', me.mastery?.yellowSpent ?? null, bp.map((p) => p.d?.mastery?.yellowSpent ?? null))}
+      ${compRow('Yellow points unspent', me.mastery?.yellowLeft ?? null, bp.map((p) => p.d?.mastery?.yellowLeft ?? null), { ratio: false })}
+      ${compRow('Total of these meals', me.list.reduce((a, m) => a + (m.value || 0), 0), bp.map((p) => (p.d?.meals ? p.d.meals.reduce((a, m) => a + (m.value || 0), 0) : null)), { f: (v) => fmt(v) + '%', hl: true })}
+      </tbody></table></div>
+      <h3>Your meal multipliers</h3>
+      <div class="scroll"><table class="minitable"><thead><tr><th>Part</th>${me.list.map((m) => `<th class="num">${esc(pretty(m.name))}</th>`).join('')}</tr></thead><tbody>
+      ${partNames.map((n) => `<tr><td>${esc(n)}</td>${me.list.map((m) => `<td class="num">${fmt(partVal(m, n))}</td>`).join('')}</tr>`).join('')}
+      </tbody></table></div>`;
+  };
+
+
+  // Icons and display names -------------------------------------------------------
+  const ic = (raw, lg) => (raw && ICONS[raw] ? `<img class="ic${lg ? ' lg' : ''}" src="${ICONS[raw]}" alt="">` : '');
+  const SK_ICON = {
+    mining: { stamps: ['StampB1', 'StampB10'], statue: 'StatueZ3', golden: 'PeanutG', box: 'UIboxUpg4', vial: 'Void', label: 'Mining' },
+    chopping: { stamps: ['StampB2', 'StampB12'], statue: 'StatueZ7', box: 'UIboxUpg6', vial: 'SaharanFoal', label: 'Choppin' },
+    catching: { stamps: ['StampB19'], statue: 'StatueZ10', box: 'UIboxUpg10', vial: 'Bug5', label: 'Catching' },
+    fishing: { stamps: ['StampB17'], statue: 'StatueZ9', golden: 'FoodG7', box: 'UIboxUpg8', vial: 'SnowB2', label: 'Fishing' },
+  };
+  const ROW_ICONS = {
+    'Hearty Diggy bubble': ['aUpgradesO2'], 'Hocus Choppus bubble': ['aUpgradesP2'], 'Slabi Orefish bubble': ['aUpgradesO21'], 'Slabe Logsoul bubble': ['aUpgradesP21'],
+    'Slabo Critterbug bubble': ['aUpgradesG21'], 'Endgame Eff I bubble': ['aUpgradesO26'], 'Endgame Eff Ii bubble': ['aUpgradesG27'], 'Endgame Eff Iii bubble': ['aUpgradesP26'],
+    'Brute Efficiency talent': ['UISkillIcon85'], 'Smart Efficiency talent': ['UISkillIcon445'], 'Elusive Efficiency talent': ['UISkillIcon263'],
+    'Copper Collector talent': ['UISkillIcon101'], 'Leaf Thief talent': ['UISkillIcon461'], "Teleki'net'ic Logs talent": ['UISkillIcon295'], "Bobbin' Bobbers talent": ['UISkillIcon116'],
+    'Right Hand of Action': ['UISkillIcon43'], 'Strength': ['UISkillIcon142'], 'Wisdom': ['UISkillIcon462', 'UISkillIcon532'], 'Agility': ['UISkillIcon296', 'UISkillIcon367'],
+    'Studious Quester talent@alleff': ['UISkillIcon617'], 'Ancient Multitool talent@alleff': ['UISkillIcon646'], 'Supersource talent@allbase': ['UISkillIcon636'],
+    'Stamp@allbase': ['StampB46'], 'Shiny@allbase': ['Mface9', 'Mface13', 'Mface21', 'Mface29'], 'Nobisect blessing@allbase': ['DivGod2'], 'Jewel@allbase': ['ConsoleJwl12'],
+    'Frost Relic artifact@alleff': ['Arti15'], 'Palette@alleff': ['GamingPal'], 'Companion@alleff': ['w5b1'], 'Prayer@alleff': ['Prayer1'], 'Post office@allbase': ['UIboxUpg20'],
+    'Meal@alleff': ['CookingMB6', 'CookingMB27', 'CookingMB41'], 'Vial@alleff': ['GodshardBar'], 'Star sign': ['ConsoleChip15'],
+  };
+  const rowIcons = (r, skill) => {
+    const k = r.key, s = SK_ICON[skill] || {};
+    if (k === 'Stamp') return s.stamps || [];
+    if (k === 'Statue') return [s.statue];
+    if (k === 'Golden food') return s.golden ? [s.golden] : [];
+    if (k === 'Post office') return [s.box];
+    if (k === 'Vial') return [s.vial];
+    return ROW_ICONS[k] || ROW_ICONS[r.baseName] || [];
+  };
+  const LABEL_ICONS = {
+    'Pickaxe Stamp level': 'StampB1', 'Cool Diggy Tool Stamp level': 'StampB10', 'Hatchet Stamp level': 'StampB2', 'Swag Swingy Tool Stamp level': 'StampB12', 'Fishing Rod Stamp level': 'StampB17',
+    'Catch Net Stamp level': 'StampB19', 'Multitool Stamp level': 'StampB46', 'Carrotman shiny level': 'Mface9', 'Gigafrog shiny level': 'Mface13', 'Mashed Potato shiny level': 'Mface21', 'Sand Giant shiny level': 'Mface29',
+    'Skill Strengthen talent level': 'UISkillIcon142', 'Deforesting All Doubt talent level': 'UISkillIcon462', 'Skill Wiz talent level': 'UISkillIcon532', 'Briar Patch Runner talent level': 'UISkillIcon296', 'Skill Ambidexterity talent level': 'UISkillIcon367',
+    'Golden Peanuts in food slot': 'PeanutG', 'Golden Peanuts in storage': 'PeanutG', 'Golden Ribs in food slot': 'FoodG7', 'Golden Ribs in storage': 'FoodG7', 'Silkrode Nanochip equipped': 'ConsoleChip15',
+    'Right Hand of Action talent level': 'UISkillIcon43', 'Molti owned': 'w5b1', 'Nobisect blessing level': 'DivGod2', 'Emerald Navette active': 'ConsoleJwl12', 'Studious Quester star talent level': 'UISkillIcon617',
+    'Ancient Multitool star talent level': 'UISkillIcon646', 'Supersource star talent level': 'UISkillIcon636', 'Skilled Dimwit equipped': 'Prayer1', 'Myriad Crate box level': 'UIboxUpg20',
+    'Dwarven Supplies box level': 'UIboxUpg4', 'Taped Up Timber box level': 'UIboxUpg6', 'Sealed Fishheads box level': 'UIboxUpg8', 'Bug Hunting Supplies box level': 'UIboxUpg10', 'Pair Green palette level': 'GamingPal',
+  };
+  const DISPLAY = {
+    'Studious Quester talent@alleff': 'Studious Quester star talent', 'Ancient Multitool talent@alleff': 'Ancient Multitool star talent', 'Supersource talent@allbase': 'Supersource star talent',
+    'Stamp@allbase': 'Multi tool Stamp', 'Shiny@allbase': 'Shiny Mobs', 'Companion@alleff': 'Pets', 'Vial@alleff': 'Vial (Dabar Special, all skills)', 'Skill mastery@alleff': 'Skill mastery (all skills)',
+    'Post office@allbase': 'Post office (Myriad Crate)', 'Account bonus@alleff': 'Account bonus (Hoops shop)', 'Schematic@alleff': 'Schematic (Caverns engineer)', 'Chip@allbase': 'Chip (base, all skills)', 'Chip@alleff': 'Chip (all skills)',
+  };
+  const displayName = (r, skill) => {
+    const lab = SK_ICON[skill]?.label || '';
+    if (r.key === 'Stamp') return `Base ${lab} Efficiency stamps`;
+    if (r.key === 'Vial') return `Vial (${lab.toLowerCase()} vial)`;
+    if (r.key === 'Skill mastery') return `Skill mastery (${lab.toLowerCase()} rank)`;
+    if (r.key === 'Post office') return `Post office (${pretty({ mining: 'Dwarven_Supplies', chopping: 'Taped_Up_Timber', catching: 'Bug_Hunting_Supplies', fishing: 'Sealed_Fishheads' }[skill])})`;
+    return DISPLAY[r.key] || r.name;
+  };
+
+  // What each source is and what feeds it, from IdleonToolbox's efficiency formulas.
+  const DESC = {
+    'Base': 'A flat starting value every character gets. Nothing to raise.',
+    'level': 'Multiplies efficiency by 1 + skill level ÷ 200. Only this character\'s own skill level counts.',
+    'stat': 'Your main stat counts twice: in base efficiency as roughly stat^0.6 and as a multiplier 1 + (stat ÷ 100)^0.35, both raised by the talents below. The stat total includes gear, cards, food and buffs, so it shifts with your loadout.',
+    'power': 'Calculated from the power sources (tool, statue, slab and endgame bubbles): 1 + their sum ÷ 100. Raise those sources to raise this.',
+    'Statue': 'Statue power, added to skill power. See the statue and Dragon statue breakdown.',
+    'slab': 'Adds skill power: the bubble\'s bonus × (slab items ÷ 100). A prismatic bubble gets an extra multiplier.',
+    'endgame': 'Adds skill power: the bubble\'s bonus × (class levels above 500 ÷ 10), so it grows with the bubble level and with this character\'s class level.',
+    'Hearty Diggy bubble': 'Multiplier 1 + bubble bonus × digits of this character\'s Max HP ÷ 100. Making the bubble prismatic multiplies its bonus.',
+    'Hocus Choppus bubble': 'Additive % in its group: bubble bonus × digits of this character\'s Max MP. Making the bubble prismatic multiplies its bonus.',
+    'Copper Collector talent': 'Multiplier 1 + talent bonus × (Helium atom level + digits of Copper Ore owned) ÷ 100.',
+    'Leaf Thief talent': 'Multiplier 1 + talent bonus × digits of leaves owned ÷ 100.',
+    "Teleki'net'ic Logs talent": 'Multiplier 1 + talent bonus × (Helium atom level + digits of Oak Logs owned) ÷ 100.',
+    'efftalent': 'An additive % in its group. The bonus grows with talent level, which is base levels plus added talent levels.',
+    'Golden food': 'The skill\'s golden food as a multiplier: 1 + golden food bonus ÷ 100 (Golden Peanut for mining, Golden Ribs for fishing). It depends on the stack the character has in its food slots and on golden food multipliers.',
+    'Fishing toolkit': 'Adds skill power: the fishing power of the bait plus the fishing power of the line equipped in the fishing toolkit.',
+    "Bobbin' Bobbers talent": 'Adds skill power: the talent bonus, capped at your fishing minigame highscore.',
+    'Kangaroo': 'An additive % from the Kangaroo fishing efficiency bonus.',
+    'Stamp': 'Base efficiency from this skill\'s stamps (the tool stamp and the second skill stamp).',
+    'Stamp@allbase': 'Base efficiency for all skills from the Multitool stamp.',
+    'Shiny@allbase': 'Base efficiency for all skills from the shiny levels of these breeding pets.',
+    'Nobisect blessing@allbase': 'Base efficiency from the Nobisect divinity blessing. It scales with blessing level and drops as your other efficiency grows.',
+    'Post office@allbase': 'Base efficiency for all skills from the Myriad Crate post office box.',
+    'Post office': 'An additive % from this skill\'s post office box.',
+    'Supersource talent@allbase': 'Base efficiency for all skills from the Supersource star talent.',
+    'Jewel@allbase': 'Base efficiency for all skills from the Emerald Navette lab jewel.',
+    'Family@alleff': 'The Hunter family bonus to skill efficiency, from your highest Hunter, Beast Master or Wind Walker class level.',
+    'Vial@alleff': 'Dabar Special, the vial for all skills. It sits in the all-skill group, which is why a second Vial row exists: the other one is this skill\'s own vial. See the vial breakdown.',
+    'Vial': 'This skill\'s own efficiency vial, separate from the Dabar Special all-skill vial. See the vial breakdown.',
+    'Frost Relic artifact@alleff': 'The Frost Relic sailing artifact; each artifact tier multiplies its bonus.',
+    'Studious Quester talent@alleff': 'Star talent, capped at 0.1% per completed quest on the account.',
+    'Meal@alleff': 'Skill efficiency meals. See the meal breakdown.',
+    'Ancient Multitool talent@alleff': 'Star talent; an additive % in the large meal group, so it is small next to the meal bonus.',
+    'Tome@alleff': 'The Tome skill efficiency bonus, from your total tome points.',
+    'Palette@alleff': 'The Pair Green colour in the Gaming palette.',
+    'Friend@alleff': 'Friend bonus to skill efficiency, from your friends list.',
+    'Skill mastery@alleff': 'Rift skill mastery (needs Rift 15): +5% for every eligible skill at family rank 5 or higher. Mining, choppin, fishing, catching, trapping and worship do not count here; the 14 other skills do. A skill\'s family rank comes from the account\'s total level in that skill. This is a different bonus from the skill\'s own mastery row.',
+    'Skill mastery': 'Rift skill mastery for this skill (needs Rift 15): +10% once this skill\'s family rank is 2 or higher. The rank comes from the account\'s total level in this skill, summed over all characters. The second mastery row (all skills) is a separate bonus.',
+    'Schematic@alleff': 'Caverns engineer schematic: 15% per Motherlode layer, plus 15% per Hive layer, Evertree layer and Bottomless Trench depth once each of their follow-up schematics is bought.',
+    'Account bonus@alleff': 'The fourth upgrade in the Hoops minigame shop: +1% efficiency for all skills per level. Each level costs 5 + 20 × its level in Hoops points.',
+    'Island shimmer@alleff': 'Shimmer island purchases × the shimmer bonus per purchase.',
+    'Companion@alleff': 'The Molti pet companion: +5% efficiency for all skills once owned, +8% once upgraded in the Pet Mart.',
+    'Summoning': 'Summoning winner bonus for skill efficiency, from your summoning wins.',
+    'Guild@alleff': 'The Multi Tool guild bonus.',
+    'Prayer@alleff': 'The Skilled Dimwit prayer, while it is equipped on this character.',
+    'Right Hand of Action': 'The Voidwalker\'s Right Hand of Action talent. It boosts this skill on any character whose level in this skill is lower than the Voidwalker\'s. On the Voidwalker itself it only works when Enhancement Eclipse enhances the talent.',
+    'Star sign': 'Star signs with this skill\'s efficiency. Infinite Stars keeps the first star signs always active, and the Silkrode Nanochip lab chip doubles every infinite star sign on the character wearing it.',
+    'Achievement': 'An achievement bonus: 10% once it is done.',
+    'Vote': 'Bonus Ballot vote for this skill, only while that vote is active.',
+    'Monument': 'See the monument breakdown.',
+  };
+  const descKey = (r, skill) => {
+    const n = r.baseName;
+    if (n === 'Base') return 'Base';
+    if (/ level$/.test(n) && !r.key.includes('@')) return 'level';
+    if (STAT_NAMES.includes(n)) return 'stat';
+    if (r.derived) return 'power';
+    if (/^Slab[ieo] /.test(n)) return 'slab';
+    if (/^Endgame Eff/.test(n)) return 'endgame';
+    if (/(Brute|Smart|Elusive) Efficiency talent/.test(n)) return 'efftalent';
+    return r.key in DESC ? r.key : n;
+  };
+  const LIST_KEYS = ['Stamp', 'Stamp@allbase', 'Shiny@allbase', 'Star sign'];
+  const labelCell = (l) => `${ic(LABEL_ICONS[l])}${esc(l)}`;
+  const inputsTable = (r, skill, char) => {
+    const mine = char.inputs?.[skill]?.[r.key];
+    const players = BENCH.skills[skill].players.map((p) => ({ name: p.player, v: BINP?.[skill]?.[p.player]?.[r.key] }));
+    if (!mine && !players.some((p) => p.v)) return '';
+    let labels; let mineVals; let theirVals;
+    if (LIST_KEYS.includes(r.key)) {
+      const order = [];
+      (mine || []).forEach((x) => order.includes(x.label) || order.push(x.label));
+      players.forEach((p) => (p.v || []).forEach((x) => order.includes(x[0]) || order.push(x[0])));
+      labels = order;
+      mineVals = order.map((l) => (mine || []).find((x) => x.label === l)?.value ?? null);
+      theirVals = players.map((p) => order.map((l) => (p.v || []).find((x) => x[0] === l)?.[1] ?? null));
+    } else {
+      labels = (mine || []).map((x) => x.label);
+      mineVals = (mine || []).map((x) => x.value);
+      theirVals = players.map((p) => labels.map((_, i) => (p.v ? p.v[i] : null)));
+    }
+    if (!labels.length) return '';
+    const cell = (v) => (v === null || v === undefined ? '–' : typeof v === 'number' ? fmt(v) : esc(v));
+    return `<div class="scroll"><table class="minitable"><thead>${headRow(skill, 'What feeds it')}</thead><tbody>
+      ${labels.map((l, i) => `<tr><td>${labelCell(l)}</td><td class="num">${cell(mineVals[i])}</td>${theirVals.map((tv) => { const v = tv[i]; const m = mineVals[i]; let pill = ''; if (typeof v === 'number' && typeof m === 'number' && !/Max level|max level|rank/.test(l)) pill = ratioCell(m, v); else if (typeof v === 'string' && typeof m === 'string' && v !== m && (v === 'yes' || v === 'no') && !/Prismatic/.test(l)) pill = ` <span class="pill ${v === 'yes' ? 'gap' : 'ahead'}">${v === 'yes' ? 'they have it' : 'you have it'}</span>`; return `<td class="num">${cell(v)}${pill}</td>`; }).join('')}</tr>`).join('')}
+      </tbody></table></div>`;
+  };
+
+  const powerSources = (r, skill, char) => {
+    const all = leaves(char.trees[skill]);
+    const pw = all.filter((l) => (l.ctx || []).some((c) => / power$/.test(c)));
+    if (!pw.length) return '';
+    const players = BENCH.skills[skill].players;
+    const sum = (vals) => vals.reduce((a, v) => a + (typeof v === 'number' ? v : 0), 0);
+    return `<h3>${esc(SK_ICON[skill].label)} power sources</h3>
+      <p class="dnote">Skill power is the sum of these. It is used twice: raised to the power 1.3 inside base efficiency, and as this multiplier, 1 + power ÷ 100.</p>
+      <div class="scroll"><table class="minitable"><thead>${headRow(skill, 'Source')}</thead><tbody>
+      ${pw.map((l) => compRow(`${rowIcons({ key: l.name, baseName: l.name }, skill).map((x) => ic(x)).join('')}${esc(l.name)}`, l.value, players.map((p) => p.leaves[l.path] ?? null))).join('')}
+      ${compRow('Total power', sum(pw.map((l) => l.value)), players.map((p) => sum(pw.map((l) => p.leaves[l.path]))), { hl: true })}
+      </tbody></table></div>`;
+  };
+  const inp = (char, skill, key, label) => (char.inputs?.[skill]?.[key] || []).find((x) => x.label === label)?.value;
+  const callout = (r, skill, char) => {
+    if (r.key === 'Golden food') {
+      const g = char.golden?.[skill]; if (!g) return '';
+      const short = g.stack < (g.cap ?? Infinity) ? ` Storage only holds ${fmt(g.storage)}, so that is the most you can put in the slot right now.` : '';
+      return `<div class="callout${g.gain > 1.01 ? ' warn' : ''}">${ic(g.raw)}<strong>${esc(pretty(g.name))}:</strong> ${fmt(g.equipped)} in this character's food slots, ${fmt(g.storage)} in storage. Food carry cap: <strong>${fmt(g.cap)}</strong> per slot.
+        With a stack of ${fmt(g.stack)} in a food slot the golden food bonus goes from ${fmt(g.current)}% to <strong>${fmt(g.capped)}%</strong>, so this multiplier goes from ${fmt(1 + g.current / 100)}× to ${fmt(1 + g.capped / 100)}×: <strong>${fmtX(g.gain)} efficiency</strong>.${short}
+        The beanstalk part (golden food on the Jade Emporium beanstalk) stays either way; the golden food multiplier is ${fmt(g.multi)}×.</div>`;
+    }
+    if (r.key === 'Right Hand of Action') {
+      const v = inp(char, skill, r.key, 'Voidwalker'); const act = inp(char, skill, r.key, 'Active');
+      const vl = inp(char, skill, r.key, 'Voidwalker ' + skill + ' level'); const cl = inp(char, skill, r.key, 'This character ' + skill + ' level');
+      if (!v) return '<div class="callout warn">No Voidwalker on this account, so Right Hand of Action is not active.</div>';
+      if (act === 'own talent') return `<div class="callout">${ic('UISkillIcon43')}This is the Voidwalker itself; the talent only counts with Enhancement Eclipse.</div>`;
+      return act === 'yes'
+        ? `<div class="callout">${ic('UISkillIcon43')}<strong>Active.</strong> ${esc(v)} is ${SK_ICON[skill].label} level ${vl}, higher than this character's ${cl}.</div>`
+        : `<div class="callout warn">${ic('UISkillIcon43')}<strong>Not active.</strong> ${esc(v)} is ${SK_ICON[skill].label} level ${vl}, not higher than this character's ${cl}. Level the Voidwalker's ${SK_ICON[skill].label.toLowerCase()} above ${cl} to turn it on.</div>`;
+    }
+    if (r.key === 'Star sign') {
+      const list = char.inputs?.[skill]?.[r.key] || [];
+      const silk = inp(char, skill, r.key, 'Silkrode Nanochip equipped') === 'yes';
+      const signs = list.slice(2);
+      const missing = signs.filter((x) => x.value === 'not equipped' || x.value === 'locked');
+      if (silk) return `<div class="callout">${ic('ConsoleChip15')}<strong>Silkrode Nanochip is equipped</strong>, so the infinite star signs are already doubled. Nothing to change here.</div>`;
+      return `<div class="callout warn">${ic('ConsoleChip15')}<strong>Silkrode Nanochip is not equipped.</strong> ${missing.length ? 'Equip these star signs: ' + missing.map((x) => esc(x.label)).join(', ') + '.' : 'Every ' + SK_ICON[skill].label.toLowerCase() + ' efficiency star sign is already active through Infinite Stars; equipping the chip would double them.'}</div>`;
+    }
+    return '';
+  };
+
+  const extraDetail = (r, skill, char) => {
+    const d0 = DESC[descKey(r, skill)];
+    const d = d0 ? d0.replace(/\s*See the [^.]*\.\s*$/, '').trim() : '';
+    let special = '';
+    if (r.baseName === 'Monument') special = monumentDetail(skill);
+    else if (r.baseName === 'Statue') special = statueDetail(skill, char);
+    else if (r.baseName === 'Vial') special = vialDetail(skill);
+    else if (r.baseName === 'Meal') special = mealDetail(skill);
+    else if (r.derived) special = powerSources(r, skill, char);
+    const inputs = special ? '' : inputsTable(r, skill, char);
+    const icons = rowIcons(r, skill).map((x) => ic(x, true)).join('');
+    const head = `<h3>${icons}${esc(displayName(r, skill))}</h3>${d ? `<p class="dnote">${esc(d)}</p>` : ''}${callout(r, skill, char)}`;
+    if (special) return head + special;
+    if (r.ignored) return `<h3>${icons}${esc(displayName(r, skill))}</h3><p class="dnote">Ignored in the ranking (${esc(r.ignored)}): it changes with the loadout, and public profiles rarely show the sampling loadout.</p>`;
+    if (inputs) return head + inputs;
+    if (r.baseName === 'Base') return head;
+    return head + '<p class="dnote">The inputs behind this one are not broken out in IdleonToolbox, so only the values are compared below.</p>';
+  };
+
+
+  // Best in slot ---------------------------------------------------------------
+  const BIS_BOARDS = { mining: ['Mining', 'HP Snapshot'], chopping: ['Chopping', 'Mana Snapshot'], catching: ['Catching'], fishing: ['Fishing'] };
+  const BIS_NOTES = {
+    'Mining': 'Mining sampler setup.',
+    'HP Snapshot': 'Worn while you enter the map before the sample is taken, so Max HP is as high as possible for the Hearty Diggy bubble. Switch to the Mining setup above afterwards.',
+    'Chopping': 'Choppin sampler setup.',
+    'Mana Snapshot': 'Worn while you enter the map before the sample is taken, so Max Mana is as high as possible for the Hocus Choppus bubble. Switch to the Chopping setup above afterwards.',
+    'Catching': 'Catching sampler setup.',
+    'Fishing': 'Fishing sampler setup. Pick bait, line and ring per fishing spot from the table below.',
+  };
+  let TIPS = [];
+  const slotBtn = (s, cat) => { if (!s) return ''; const id = TIPS.push({ ...s, cat }) - 1; return `<button type="button" class="slot" data-tip="${id}" aria-label="${esc(s.tip.title)}"><img src="${BIS.imgs[s.raw]}" alt=""></button>`; };
+  const td = (s, cat, cls = '') => `<td class="${(s ? '' : 'empty ') + cls}">${slotBtn(s, cat)}</td>`;
+  const groupHtml = (g) => {
+    if (g.cat === 'Cards') {
+      const row = (a) => a.map((c) => td(c, 'Cards', 'cd')).join('');
+      return `<div class="sg"><span class="cap">Cards</span><table class="slots"><tbody><tr><td class="set" rowspan="2">${slotBtn(g.set, 'Card set')}</td>${row(g.cards.slice(0, 4))}</tr><tr>${row(g.cards.slice(4, 8))}</tr></tbody></table></div>`;
+    }
+    let rows = '';
+    const cells = g.cells.slice();
+    if (g.span0) { rows += `<tr><td colspan="2" class="${cells[0] ? '' : 'empty'}">${slotBtn(cells[0], g.cat)}</td></tr>`; cells.splice(0, 2); }
+    for (let i = 0; i < cells.length; i += g.cols) rows += `<tr>${cells.slice(i, i + g.cols).map((c) => td(c, g.cat)).join('')}</tr>`;
+    return `<div class="sg"><span class="cap">${esc(g.cat)}</span><table class="slots"><tbody>${rows}</tbody></table></div>`;
+  };
+  const bisBoard = (name) => {
+    const b = BIS.boards.find((x) => x.name === name); if (!b) return '';
+    return `<article class="setup"><h3>${esc(name)}</h3><div class="setup-groups">${b.groups.map(groupHtml).join('')}</div><p class="dnote">${esc(BIS_NOTES[name] || '')}</p></article>`;
+  };
+  const spotsHtml = () => {
+    if (!BIS.spots) return '';
+    const ic = (s, cat) => `<td class="ic">${s ? slotBtn(s, cat) : ''}</td>`;
+    const body = BIS.spots.map((p) => `<tr><td colspan="6" class="sub">${esc(p.title)}</td></tr>` + p.rows.map((r) => `<tr>${ic(r.fish, 'Fish')}<td>${esc(r.fish.tip.title)}</td>${ic(r.bait, 'Bait')}${ic(r.line, 'Line')}${ic(r.ring, 'Ring')}<td>${r.loc ? esc(r.loc) : ''}${r.note ? `<div class="src-ctx">${esc(r.note)}</div>` : ''}</td></tr>`).join('')).join('');
+    return `<article class="setup spots"><h3>Fishing spots</h3>
+      <div class="scroll"><table class="minitable"><thead><tr><th colspan="2">Fish</th><th>Bait</th><th>Line</th><th>Ring</th><th>Where</th></tr></thead><tbody>${body}</tbody></table></div>
+      <p class="dnote">${slotBtn(BIS.zeus, 'Line')} For Bloach, Kraken and Caulifish, Zeus Gon Fishin was better than Platinum Twine depending on whether you were at an efficiency break point. Try it out yourself, or just use Platinum Twine. The difference is 1 to 2% at best.</p></article>`;
+  };
+  const bisSection = (skill) => {
+    TIPS = [];
+    const boards = BIS_BOARDS[skill] || [];
+    return `<section class="bis-wrap" aria-label="Best in slot">
+      <div class="bis-head"><h2>Best in slot</h2><span class="dnote">Hover or tap an item for its description and stats.</span></div>
+      <div class="bis-boards">${boards.map(bisBoard).join('')}${skill === 'fishing' ? spotsHtml() : ''}</div>
+      <p class="credit">Taken and updated from AlmostPsycho's Sampling Sheet, Thank you.</p>
+    </section>`;
+  };
+  const tipEl = document.createElement('div'); tipEl.className = 'bis-tip'; tipEl.hidden = true; tipEl.setAttribute('role', 'tooltip'); document.body.appendChild(tipEl);
+  const showTip = (btn) => {
+    const s = TIPS[Number(btn.dataset.tip)]; if (!s) return;
+    const fmtB = (v) => (Math.round(v * 100) / 100).toLocaleString('en-US');
+    const lines = s.tip.lines.slice();
+    const save = analysis?.bisSave;
+    const saveLines = [];
+    if (s.cardIndex) {
+      const c = save?.cards?.[s.cardIndex];
+      if (!save) saveLines.push('Import a save to see your bonus.');
+      else if (!c || !(c.amount > 0)) saveLines.push('Your save: card not found yet.');
+      else {
+        saveLines.push(`Your save: ${s.tip.effect.replace('{', fmtB(c.bonus))} (card level ${c.stars + 1})`);
+        if (s.omega) saveLines.push(`In this slot: ${s.tip.effect.replace('{', fmtB(2 * c.bonus))}. ${s.omega}`);
+      }
+    } else if (s.omega) lines.push(s.omega);
+    if (s.setRaw) {
+      const c = save?.cardSets?.[s.setRaw];
+      saveLines.push(!save ? 'Import a save to see your bonus.' : c ? `Your save: ${s.tip.effect.replace('{', fmtB(c.bonus))} (set level ${Math.max(0, (c.stars ?? -1) + 1)})` : 'Your save: set not found.');
+    }
+    if (s.prayerName) {
+      const p = save?.prayers?.[s.prayerName];
+      if (!save) saveLines.push('Import a save to see your bonus.');
+      else if (p) {
+        saveLines.push(`Your save: ${s.tip.effect.replace('{', fmtB(p.bonus))} at level ${p.level}${p.maxLevel ? ' / ' + p.maxLevel : ''}`);
+        saveLines.push(p.curse ? `Curse: ${s.tip.curse.replace('{', fmtB(p.curse))}` : 'Curse: none on your save');
+      }
+    }
+    tipEl.innerHTML = `<span class="ty">${esc(s.cat)} · ${esc(s.tip.type)}</span><span class="t">${esc(s.tip.title)}</span>${saveLines.length ? `<span class="sv">${saveLines.map(esc).join('<br>')}</span>` : ''}${lines.length ? `<ul>${lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}`;
+    tipEl.hidden = false;
+    const r = btn.getBoundingClientRect(); const tw = tipEl.offsetWidth, th = tipEl.offsetHeight;
+    let x = r.left + r.width / 2 - tw / 2; x = Math.max(8, Math.min(x, window.innerWidth - tw - 8));
+    let y = r.bottom + 8; if (y + th > window.innerHeight - 8) y = Math.max(8, r.top - th - 8);
+    tipEl.style.left = x + 'px'; tipEl.style.top = y + 'px';
+  };
+  const hideTip = () => { tipEl.hidden = true; };
+  document.addEventListener('mouseover', (e) => { const b = e.target.closest && e.target.closest('.bis-wrap .slot'); if (b) showTip(b); });
+  document.addEventListener('mouseout', (e) => { const b = e.target.closest && e.target.closest('.bis-wrap .slot'); if (b && !b.contains(e.relatedTarget)) hideTip(); });
+  document.addEventListener('focusin', (e) => { const b = e.target.closest && e.target.closest('.bis-wrap .slot'); if (b) showTip(b); });
+  document.addEventListener('focusout', (e) => { if (e.target.closest && e.target.closest('.bis-wrap .slot')) hideTip(); });
+  document.addEventListener('click', (e) => { const b = e.target.closest && e.target.closest('.bis-wrap .slot'); if (b) showTip(b); else hideTip(); });
+  window.addEventListener('scroll', hideTip, { passive: true });
+
+  // Render ------------------------------------------------------------------
+  const render = () => {
+    renderTabs();
+    const panel = $('panel');
+    if (!analysis) { panel.innerHTML = '<p class="lede">Import a save to compare it with the top samplers.</p>'; return; }
+    const skill = current, meta = SKILL_META[skill];
+    if (!charChoice[skill]) charChoice[skill] = pickDefaultChar(skill);
+    const char = analysis.chars.find((c) => c.name === charChoice[skill]);
+    if (!char || !char.trees[skill]) { panel.innerHTML = '<p class="err">No efficiency data for this character.</p>'; return; }
+
+    const { base, rows, allGain } = compare(skill, char);
+    const players = BENCH.skills[skill].players;
+    const bestTop = players.reduce((a, p) => (p.eff > a.eff ? p : a), players[0]);
+    const mySample = analysis.samples?.[skill];
+
+    const counted = rows.filter((r) => !r.ignored && r.best);
+    const gaps = counted.filter((r) => !r.derived && r.best.gain > 1.005).sort((a, b) => b.best.gain - a.best.gain);
+    const others = counted.filter((r) => r.derived || !(r.best.gain > 1.005)).sort((a, b) => (b.best?.gain || 0) - (a.best?.gain || 0));
+    const ignored = rows.filter((r) => r.ignored);
+    const maxLog = Math.max(...gaps.map((r) => Math.log(r.best.gain)), 0.01);
+
+    const famSet = new Set(meta.family);
+    const sortedChars = analysis.chars.filter((c) => c.trees[skill]).slice().sort((a, b) => (famSet.has(b.cls) - famSet.has(a.cls)) || ((b.values[skill] || 0) - (a.values[skill] || 0)));
+
+    const lab = SK_ICON[skill].label;
+    const SECTIONS = [
+      ['skill', `${lab} multipliers`, 'skill-specific sources'],
+      ['power', `${lab} power`, 'counted in base efficiency and as a multiplier'],
+      ['all', 'All skill efficiency', 'shared by every skill'],
+      ['post', 'Post offices', ''],
+      ['base', 'Base efficiency', `base ${lab.toLowerCase()} efficiency and base efficiency for all skills`],
+    ];
+    const rowHtml = (r) => {
+      const isOpen = openRows.has(skill + r.path);
+      const cls = r.ignored ? 'row-ign' : (!r.derived && r.best && r.best.gain > 1.005 ? '' : 'row-ahead');
+      const g = r.best ? r.best.gain : NaN;
+      const width = r.best && g > 1 ? Math.max(3, Math.round(100 * Math.log(g) / maxLog)) : 0;
+      const u = unitLabel(r.unit);
+      let out = `<tr class="${cls}">
+        <td><button type="button" class="link" data-row="${esc(r.path)}" aria-expanded="${isOpen}"><span class="chev" aria-hidden="true">${isOpen ? '▾' : '▸'}</span><span class="src-name">${rowIcons(r, skill).map((x) => ic(x)).join('')}${esc(displayName(r, skill))}</span></button><div class="src-ctx">${r.statNote ? 'Main stat, counted in base efficiency and as a multiplier · includes stats from gear' : r.derived ? 'Calculated from the power sources above; matching a power source raises this too' : esc(ctxLabel(r.ctx, skill))}</div></td>
+        <td class="num">${fmt(r.value)}${u}</td>
+        <td class="num">${fmt(r.med)}${u}</td>
+        <td class="num">${r.best ? fmt(r.best.value) + u + `<div class="who">${esc(r.best.player)}</div>` : '–'}</td>
+        <td class="num"><div class="gain"><div class="bar" aria-hidden="true"><i style="width:${width}%"></i></div><span>${r.best ? fmtX(g) : '–'}</span></div></td>
+        <td>${status(r)}</td></tr>`;
+      if (isOpen) {
+        const extra = extraDetail(r, skill, char);
+        out += `<tr class="detail"><td colspan="6"><div class="dwrap">${extra ? `<div class="dsec">${extra}</div>` : ''}<div class="dsec"><h3>${esc(displayName(r, skill))}: each top sampler</h3><div class="scroll"><table class="minitable"><thead><tr><th>Player</th><th>Character</th><th class="num">Value</th><th class="num">Your efficiency if matched</th></tr></thead><tbody>
+          <tr class="you"><td>You</td><td>${esc(char.name)}</td><td class="num">${fmt(r.value)}${u}</td><td class="num">1×</td></tr>
+          ${r.theirs.map((t) => `<tr><td>${esc(t.player)}</td><td>${esc(t.char)}</td><td class="num">${fmt(t.value)}${u}</td><td class="num">${typeof t.gain === 'number' ? fmtX(t.gain) : '–'}</td></tr>`).join('')}
+          </tbody></table></div></div></div></td></tr>`;
+      }
+      return out;
+    };
+
+    panel.innerHTML = `
+      ${bisSection(skill)}
+      <div class="controls">
+        <div class="field"><label for="charSel">Your ${esc(meta.tab.toLowerCase())} character</label>
+          <select id="charSel">${sortedChars.map((c) => `<option value="${esc(c.name)}" ${c.name === char.name ? 'selected' : ''}>${esc(c.name)} · ${esc(pretty(c.cls))} · lv ${c.skillLv[skill]}${mySample?.char === c.name ? ' · best sample' : ''}</option>`).join('')}</select></div>
+        <label class="check" for="showAhead"><input type="checkbox" id="showAhead" ${showAhead ? 'checked' : ''}> Show sources where you are level or ahead</label>
+        <label class="check" for="showIgn"><input type="checkbox" id="showIgn" ${showIgnored ? 'checked' : ''}> Show ignored sources</label>
+        <div class="btnrow"><button type="button" id="expandAll">Expand all</button><button type="button" id="collapseAll">Collapse all</button></div>
+      </div>
+
+      <div class="headline">
+        <div class="stat"><span class="eyebrow">Your efficiency</span><span class="v">${fmt(base)}</span><span class="s">${esc(char.name)}, ${esc(meta.tab)} lv ${char.skillLv[skill]}</span></div>
+        <div class="stat"><span class="eyebrow">Best top sampler</span><span class="v">${fmt(bestTop.eff)}</span><span class="s">${esc(bestTop.player)} (${esc(bestTop.char)}) · ${fmtX(bestTop.eff / base)} yours</span></div>
+        <div class="stat warn"><span class="eyebrow">Close every gap</span><span class="v">${fmtX(allGain)}</span><span class="s">efficiency if each counted source matched the best value, ≈ ${fmtX(Math.pow(allGain, 0.35))} items per action</span></div>
+        <div class="stat"><span class="eyebrow">Your best ${esc(meta.item)} sample</span><span class="v">${mySample ? fmt(mySample.value) : '–'}</span><span class="s">${mySample ? esc(mySample.char) + ' · #1 has ' + fmtX(players.reduce((a, p) => Math.max(a, p.sample), 0) / mySample.value) + ' yours' : 'no sample of this item'}</span></div>
+      </div>
+
+      <div class="top5"><h2>Biggest gaps</h2>
+        ${gaps.length ? `<ol>${gaps.slice(0, 5).map((r) => `<li><strong>${rowIcons(r, skill).map((x) => ic(x)).join('')}${esc(displayName(r, skill))}</strong> <span class="src-ctx">${esc(ctxLabel(r.ctx, skill))}</span> · ${fmtX(r.best.gain)} efficiency at ${esc(r.best.player)}'s ${fmt(r.best.value)}${unitLabel(r.unit)} (yours ${fmt(r.value)}${unitLabel(r.unit)})</li>`).join('')}</ol>` : '<p class="lede">No source is behind the top samplers.</p>'}
+      </div>
+
+      <div class="versus"><div class="scroll"><table><thead><tr><th>Top sampler</th><th>Character</th><th class="num">${esc(meta.tab)} lv</th><th class="num">Efficiency</th><th class="num">vs yours</th><th class="num">${esc(meta.item)} sample</th></tr></thead><tbody>
+        <tr class="you"><td>You</td><td>${esc(char.name)} · ${esc(pretty(char.cls))}</td><td class="num">${char.skillLv[skill]}</td><td class="num">${fmt(base)}</td><td class="num">1×</td><td class="num">${mySample ? fmt(mySample.value) : '–'}</td></tr>
+        ${players.map((p) => `<tr><td>${esc(p.player)}</td><td>${esc(p.char)} · ${esc(pretty(p.cls))}</td><td class="num">${p.skillLv}</td><td class="num">${fmt(p.eff)}</td><td class="num">${fmtX(p.eff / base)}</td><td class="num">${fmt(p.sample)}</td></tr>`).join('')}
+      </tbody></table></div></div>
+
+      <div class="sources"><div class="scroll"><table>
+        <thead><tr><th>Source</th><th class="num">You</th><th class="num">Top-5 median</th><th class="num">Best</th><th class="num">Gain if matched</th><th>Status</th></tr></thead>
+        <tbody>${SECTIONS.map(([id, title, note]) => {
+          const inSec = (r) => sectionOf(r) === id;
+          const body = gaps.filter(inSec).map(rowHtml).join('') + (showAhead ? others.filter(inSec).map(rowHtml).join('') : '') + (showIgnored ? ignored.filter(inSec).map(rowHtml).join('') : '');
+          return body ? `<tr class="section"><td colspan="6">${esc(title)} <span class="src-ctx">${esc(note)}</span></td></tr>` + body : '';
+        }).join('')}</tbody>
+      </table></div></div>`;
+
+    $('charSel').addEventListener('change', (e) => { charChoice[skill] = e.target.value; openRows.clear(); render(); });
+    $('showAhead').addEventListener('change', (e) => { showAhead = e.target.checked; render(); });
+    $('showIgn').addEventListener('change', (e) => { showIgnored = e.target.checked; render(); });
+    $('expandAll').addEventListener('click', () => { panel.querySelectorAll('button[data-row]').forEach((b) => openRows.add(skill + b.dataset.row)); render(); });
+    $('collapseAll').addEventListener('click', () => { openRows.clear(); render(); });
+    panel.querySelectorAll('button[data-row]').forEach((b) => b.addEventListener('click', () => { const k = skill + b.dataset.row; openRows.has(k) ? openRows.delete(k) : openRows.add(k); render(); }));
+  };
+
+  // Boot ----------------------------------------------------------------------
+  $('benchDate').textContent = new Date(BENCH.createdAt).toLocaleDateString('de-CH', { dateStyle: 'long' });
+  let restored = null;
+  try { const s = localStorage.getItem(STORE_KEY); if (s) restored = JSON.parse(s); } catch (e) { restored = null; }
+  if (restored && restored.a && restored.a.chars) loadAnalysis(restored.a, restored.label || 'Your last imported save', false);
+  else if (PRELOADED) loadAnalysis(PRELOADED, 'Built-in save', false);
+  else { setStatus(describeSource()); render(); }
+})();
+</script>
