@@ -6,7 +6,7 @@ Calculators for [Legends of IdleOn](https://www.legendsofidleon.com/), all in on
 
 | Tool | What it does |
 | --- | --- |
-| [Sampling and Gear Companion](sampling-gear-companion/) | 3D Printer samples: compares your Mining, Logs, Catching and Fishing efficiency with the top public samplers, source by source, with best-in-slot setups. |
+| [Sampling and Gear Companion](sampling-gear-companion/) | 3D Printer samples: compares your Mining, Chopping, Catching and Fishing efficiency with the top public samplers, source by source, with best-in-slot setups. |
 | [Stamp Upgrade Planner](stamp-planner/) | Which stamp upgrades fit in a character's inventory, with Gilded Stamps and Hydrogen, sorted by how close to the carry cap they are. |
 
 ## Layout
