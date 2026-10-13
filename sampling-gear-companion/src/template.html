@@ -1159,8 +1159,8 @@ const ICONS = /*__ICONS__*/;
       ['level', 'GalleryBell', 'Gallery level', (v) => 3 * v, 'The gallery\'s own upgrade level in Spelunking: +3% per level. It also adds podiums (one per 4 levels).'],
       ['chip', 'ConsoleChip16', 'Silkrode Motherboard lab chip', (v) => 10 * v, 'Lab chip on this character: +10% while it is equipped. Only counts for the character wearing it.'],
       ['clam', 'ClamPearl0', 'Clam Work bonus', (v) => 3 * v, 'Clam Work bonus 8 in World 7: +3% per level.'],
-      ['killroy', 'Killroy', 'Killroy shop', (v) => v, 'The Killroy skull shop upgrade for the gallery (it also gives up to 2 level 2 podiums).'],
-      ['bubble', 'aUpgradesY32', 'Codfrey Rulz OK bubble', (v) => v, 'Alchemy bubble, capped at +20%. Level the bubble to get closer to the cap.'],
+      ['killroy', 'Killroy', 'Killroy shop', (v) => v, 'The Killroy skull shop "Gallery Multiplier" upgrade: level ÷ (200 + level) × 10%, so it creeps toward +10% (half of it at level 200).', ['killroyLevel', 'Upgrade level']],
+      ['bubble', 'aUpgradesY32', 'Codfrey Rulz OK bubble', (v) => v, 'Alchemy bubble, capped at +20%. The bonus also depends on your bubble multipliers, so a higher level does not always mean a higher bonus.', ['bubbleLevel', 'Bubble level']],
       ['card', '2CardsJ11', 'Coralcave Crab card', (v) => v, '+1% per card level, up to level 10 (+10%). Collect more Coralcave Crab cards.'],
       ['companion', 'Bubba', 'Bubba the Seal companion', (v) => v, 'Companion bonus: +30% once owned, +50% once upgraded in the Pet Mart.'],
       ['sushi', 'Sushi6', 'Sushi Station bonus', (v) => v, 'The Sushi Station bonus for the gallery.'],
@@ -1169,9 +1169,14 @@ const ICONS = /*__ICONS__*/;
     const pParts = players.map((p) => { const bp = BENCH.skills[skill].players.find((x) => x.player === p.name); return p.g?.multiParts ? { ...p.g.multiParts, chip: bp?.galleryChip ?? 0 } : null; });
     const gmTotal = (pp) => (pp ? 1 + GM.reduce((a, [k, , , f]) => a + f(pp[k] || 0), 0) / 100 : null);
     const gmOpen = openRows.has(skill + 'galmulti');
-    const gmRows = GM.map(([k, icon, label, f, how]) => {
+    const gmRows = GM.map(([k, icon, label, f, how, lvl]) => {
       const mine = f(myParts[k] || 0); const theirs = pParts.map((pp) => (pp ? f(pp[k] || 0) : null));
-      return `<tr><td>${ic(icon)}${esc(label)}<div class="src-ctx">${esc(how)}</div></td><td class="num">+${fmt(mine)}%</td>${theirs.map((v) => `<td class="num${v != null && v > mine + 1e-9 ? ' better' : ''}">${v == null ? '–' : '+' + fmt(v) + '%'}</td>`).join('')}</tr>`;
+      let out = `<tr><td>${ic(icon)}${esc(label)}<div class="src-ctx">${esc(how)}</div></td><td class="num">+${fmt(mine)}%</td>${theirs.map((v) => `<td class="num${v != null && v > mine + 1e-9 ? ' better' : ''}">${v == null ? '–' : '+' + fmt(v) + '%'}</td>`).join('')}</tr>`;
+      if (lvl) {
+        const [lk, lname] = lvl; const ml = myParts[lk];
+        out += `<tr><td style="padding-left:34px"><span class="src-ctx">${esc(lname)}</span></td><td class="num">${typeof ml === 'number' ? fmt(ml) : '–'}</td>${pParts.map((pp) => { const v = pp?.[lk]; return `<td class="num${typeof v === 'number' && typeof ml === 'number' && v > ml ? ' better' : ''}">${typeof v === 'number' ? fmt(v) : '–'}</td>`; }).join('')}</tr>`;
+      }
+      return out;
     }).join('');
     const gmTable = `<div class="scroll"><table class="minitable"><thead>${head}</thead><tbody>
       <tr class="hl"><td><button type="button" class="link" data-row="galmulti" aria-expanded="${gmOpen}"><span class="chev" aria-hidden="true">${gmOpen ? '▾' : '▸'}</span>${ic('GalleryPodiumA3')}Gallery bonus multi</button><div class="src-ctx">multiplies every trophy and nametag bonus; ${esc(char?.name || '')} ${myParts.chip ? 'wears' : 'does not wear'} the Silkrode Motherboard</div></td><td class="num">${fmt(gmTotal(myParts))}×</td>${pParts.map((pp) => { const v = gmTotal(pp); return `<td class="num${v != null && v > gmTotal(myParts) + 1e-9 ? ' better' : ''}">${v == null ? '–' : fmt(v) + '×'}</td>`; }).join('')}</tr>

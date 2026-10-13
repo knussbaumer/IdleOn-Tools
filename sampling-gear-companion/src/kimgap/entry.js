@@ -281,7 +281,8 @@ export const analyzeSave = (raw) => {
       multiParts: (() => { const s = (f) => { try { return Number(f()) || 0; } catch (e) { return 0; } }; return {
         level: s(() => g.rawSpelunk?.[13]?.[4]), clam: s(() => getClamWorkBonus(account, 7)), killroy: s(() => getKillRoyShopBonus(account, 3)),
         bubble: s(() => Math.min(20, getBubbleBonus(account, 'CODFREY_RULZ_OK', false))), card: s(() => Math.min(getCardLevel(account?.cards, 'w7a11'), 10)),
-        companion: s(() => (isCompanionBonusActive(account, 49) ? account?.companions?.list?.at(49)?.bonus : 0)), sushi: s(() => getSushiBonus(account, 54)) }; })(),
+        companion: s(() => (isCompanionBonusActive(account, 49) ? account?.companions?.list?.at(49)?.bonus : 0)), sushi: s(() => getSushiBonus(account, 54)),
+        killroyLevel: s(() => account?.accountOptions?.[467]), bubbleLevel: s(() => (account?.alchemy?.bubblesFlat || Object.values(account?.alchemy?.bubbles || {}).flat()).find((b) => b?.bubbleName === 'CODFREY_RULZ_OK')?.level) }; })(),
     };
   } catch (e) {}
   return { gallery, trophies, chars, samples, extras, details, bisSave, lastUpdated: save.lastUpdated ?? null };
