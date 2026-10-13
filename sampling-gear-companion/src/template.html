@@ -942,6 +942,14 @@ const ICONS = /*__ICONS__*/;
       <div class="supers">${tRow}</div><div class="supers">${cRow}</div>
       <p class="dnote">Every talent preset with every card preset, run through the ${lab} efficiency formula. ${cardSpread < 1.001 ? 'The card presets make no difference here: with the Rift skill mastery bonus every card you own counts for skill efficiency, not only the equipped ones. ' : ''}Stats from talents and cards (${lab === 'chopping' ? 'Wisdom' : lab === 'catching' ? 'Agility' : 'Strength'}) are not part of this check, because the save only has the totals for what is equipped right now.</p></article>`;
   };
+  const spotsHtml = () => {
+    if (!BIS.spots) return '';
+    const ic = (s, cat) => `<td class="ic">${s ? slotBtn(s, cat) : ''}</td>`;
+    const body = BIS.spots.map((p) => `<tr><td colspan="6" class="sub">${esc(p.title)}</td></tr>` + p.rows.map((r) => `<tr>${ic(r.fish, 'Fish')}<td>${esc(r.fish.tip.title)}</td>${ic(r.bait, 'Bait')}${ic(r.line, 'Line')}${ic(r.ring, 'Ring')}<td>${r.loc ? esc(r.loc) : ''}${r.note ? `<div class="src-ctx">${esc(r.note)}</div>` : ''}</td></tr>`).join('')).join('');
+    return `<article class="setup spots"><h3>Fishing spots</h3>
+      <div class="scroll"><table class="minitable"><thead><tr><th colspan="2">Fish</th><th>Bait</th><th>Line</th><th>Ring</th><th>Where</th></tr></thead><tbody>${body}</tbody></table></div>
+      <p class="dnote">${slotBtn(BIS.zeus, 'Line')} For Bloach, Kraken and Caulifish, Zeus Gon Fishin was better than Platinum Twine depending on whether you were at an efficiency break point. Try it out yourself, or just use Platinum Twine. The difference is 1 to 2% at best.</p></article>`;
+  };
   const bisSection = (skill, char) => {
     TIPS = [];
     const boards = BIS_BOARDS[skill] || [];
@@ -995,6 +1003,78 @@ const ICONS = /*__ICONS__*/;
   document.addEventListener('focusout', (e) => { if (e.target.closest && e.target.closest('.bis-wrap .slot')) hideTip(); });
   document.addEventListener('click', (e) => { const b = e.target.closest && e.target.closest('.bis-wrap .slot'); if (b) showTip(b); else hideTip(); });
   window.addEventListener('scroll', hideTip, { passive: true });
+
+  // AFK gains -------------------------------------------------------------------
+  // The sample is 90% of the hourly AFK yield, and AFK yield scales 1:1 with the AFK gains rate, so a
+  // gain here is a gain in sample size directly (an efficiency gain only counts at about the power 0.35).
+  const AFK_IGNORE = [/^Gear/, /^Obols/, /^Cards?$/, /^Card Set$/, /^Chips$/, /^Equipment AFK multi$/];
+  const AFK_DESC = {
+    'Base rate': 'Every skill starts at 50%.',
+    'Talents': { mining: "Idle Skilling and the Tick Tock star talent.", chopping: "Active Afk'er and the Tick Tock star talent.", catching: 'Sunset on the Hives and the Tick Tock star talent.', fishing: "Idle Skilling, Catching Some Zzz's and the Tick Tock star talent." },
+    'Star sign': 'Star signs with skill AFK gains.',
+    'Trapping Bonus': 'The trapping bonus for AFK gains.',
+    'Bribe': 'The bribe for skill AFK gains.',
+    'Card': 'This skill\'s AFK gain cards. With the Rift skill mastery bonus every card you own counts.',
+    'Post Office': 'The second bonus of this skill\'s post office box.',
+    'Bubble': { mining: 'Dream of Ironfish bubble.', fishing: 'Dream of Ironfish bubble.', chopping: 'Tree Sleeper bubble.', catching: 'Fly in Mind bubble.' },
+    'Base': 'A flat 2% skill AFK gains.',
+    'Family': 'Beast Master family bonus.',
+    'Guild': 'Guild bonus for skill AFK gains.',
+    'Sleepin On The Job (VW Eclipse)': "Sleepin' on the Job, only with the Voidwalker's Enhancement Eclipse.",
+    'Sigil': 'Dream Catcher sigil.',
+    'Prayers': 'Zerg Rushogen prayer bonus minus the Ruck Sack prayer curse, for the prayers on this character.',
+    'Tasks': 'Task merit for AFK gains.', 'Arcade': 'Arcade shop AFK gains.', 'Compass': 'Compass upgrade.', 'Void Set': 'Void armor set bonus.',
+    'Dungeons': 'Dungeon Flurbo shop AFK gains.', 'Divinity Major': 'Snehebatu major bonus (+30%) while linked.', 'Divinity Minor': 'Goharut minor bonus.',
+    'Companion': 'Companions with AFK gains.', 'Shrine': 'The AFK gains shrine on the map this character is on.', 'Rando Event Looty': 'Rando Event Looty star talent × random event items found.',
+    'Summoning': 'Summoning winner bonus for AFK gains.', 'Golden Food': 'Golden Dumpling (all AFK gains golden food).', 'Passive cards': 'Passive AFK gain cards.',
+    'Kangaroo': 'Kangaroo AFK gains bonus.', 'Vote': 'Bonus Ballot vote for AFK gains, while it is active.', 'Event Shop': 'Event shop AFK gains.', 'Vault': 'Upgrade Vault AFK gains.',
+    'Bundle': 'Gem shop bundle.', 'Tesseract Map': 'Tesseract map bonus multiplier.',
+  };
+  const compareAfk = (skill, char) => {
+    const mine = char.afk?.trees?.[skill]; if (!mine) return null;
+    const base = evalTree(mine);
+    const players = BENCH.skills[skill].players.filter((p) => p.afkLeaves);
+    const rows = leaves(mine).map((l) => {
+      const theirs = players.map((p) => ({ player: p.player, char: p.char, value: p.afkLeaves[l.path] }));
+      let best = null;
+      for (const th of theirs) { if (typeof th.value !== 'number') continue; th.gain = evalTree(withLeaves(mine, { [l.path]: th.value })) / base; if (!best || th.gain > best.gain) best = th; }
+      return { ...l, theirs, best, med: median(theirs.map((x) => x.value)), ignored: AFK_IGNORE.some((re) => re.test(l.name)) ? 'Loadout' : null };
+    });
+    const allMap = {}, fullMap = {};
+    rows.forEach((r) => { if (r.best && r.best.gain > 1) { fullMap[r.path] = r.best.value; if (!r.ignored) allMap[r.path] = r.best.value; } });
+    return { base, rows, allGain: evalTree(withLeaves(mine, allMap)) / base, fullGain: evalTree(withLeaves(mine, fullMap)) / base, players };
+  };
+  const afkSection = (skill, char) => {
+    const a = compareAfk(skill, char);
+    if (!a) return '<section class="afk"><h2>AFK gains</h2><p class="lede">Import your save again to see the AFK gains comparison.</p></section>';
+    const bestTop = a.players.reduce((x, p) => (p.afk > (x?.afk || 0) ? p : x), null);
+    const unitOf = (r) => (r.unit === 'multiplier' || /multi|Tesseract/i.test(r.name) ? '×' : '%');
+    const rowsSorted = a.rows.filter((r) => showIgnored || !r.ignored).filter((r) => showAhead || r.ignored || (r.best && r.best.gain > 1.0005)).sort((x, y) => (y.best?.gain || 0) - (x.best?.gain || 0));
+    const maxLog = Math.max(...a.rows.filter((r) => !r.ignored && r.best).map((r) => Math.log(r.best.gain)), 0.01);
+    const desc = (r) => { const d = AFK_DESC[r.name]; return typeof d === 'object' ? d[skill] : d; };
+    const row = (r) => {
+      const key = 'afk' + r.path; const isOpen = openRows.has(skill + key); const u = unitOf(r);
+      const g = r.best ? r.best.gain : NaN; const width = r.best && g > 1 ? Math.max(3, Math.round(100 * Math.log(g) / maxLog)) : 0;
+      const st = r.ignored ? '<span class="pill ign">ignored · loadout</span>' : !r.best ? '<span class="pill even">no data</span>' : g > 1.005 ? '<span class="pill gap">gap</span>' : g < 0.9999 || r.theirs.every((t) => typeof t.value !== 'number' || t.value <= r.value + 1e-9) ? '<span class="pill ahead">at or above top</span>' : '<span class="pill even">level</span>';
+      let out = `<tr class="${r.ignored ? 'row-ign' : g > 1.005 ? '' : 'row-ahead'}"><td><button type="button" class="link" data-row="${esc(key)}" data-afk="1" aria-expanded="${isOpen}"><span class="chev" aria-hidden="true">${isOpen ? '▾' : '▸'}</span><span class="src-name">${esc(r.name)}</span></button><div class="src-ctx">${esc((r.ctx || []).join(' › ') || (u === '×' ? 'AFK gains multiplier' : 'AFK gains'))}</div></td>
+        <td class="num">${fmt(r.value)}${u}</td><td class="num">${fmt(r.med)}${u}</td><td class="num">${r.best ? fmt(r.best.value) + u + `<div class="who">${esc(r.best.player)}</div>` : '–'}</td>
+        <td class="num"><div class="gain"><div class="bar" aria-hidden="true"><i style="width:${width}%"></i></div><span>${r.best ? fmtX(g) : '–'}</span></div></td><td>${st}</td></tr>`;
+      if (isOpen) out += `<tr class="detail"><td colspan="6"><div class="dwrap"><div class="dsec"><h3>${esc(r.name)}</h3>${desc(r) ? `<p class="dnote">${esc(desc(r))}</p>` : ''}</div><div class="dsec"><div class="scroll"><table class="minitable"><thead><tr><th>Player</th><th>Character</th><th class="num">Value</th><th class="num">Your AFK gains if matched</th></tr></thead><tbody>
+        <tr class="you"><td>You</td><td>${esc(char.name)}</td><td class="num">${fmt(r.value)}${u}</td><td class="num">1×</td></tr>
+        ${r.theirs.map((t) => `<tr><td>${esc(t.player)}</td><td>${esc(t.char)}</td><td class="num">${fmt(t.value)}${u}</td><td class="num">${typeof t.gain === 'number' ? fmtX(t.gain) : '–'}</td></tr>`).join('')}</tbody></table></div></div></div></td></tr>`;
+      return out;
+    };
+    return `<section class="afk" style="display:grid;gap:14px"><h2>AFK gains</h2>
+      <p class="dnote">The sample is 90% of what the character makes per hour AFK, and that scales one to one with the AFK gains rate. So a gain here grows the sample by the same factor, while an efficiency gain only counts at about the power 0.35. Values are for this character as if it were AFK on ${esc(SK_ICON[skill].label.toLowerCase())}.</p>
+      <div class="headline">
+        <div class="stat"><span class="eyebrow">Your AFK gains</span><span class="v">${fmt(a.base)}%</span><span class="s">${esc(char.name)}</span></div>
+        <div class="stat"><span class="eyebrow">Best top sampler</span><span class="v">${bestTop ? fmt(bestTop.afk) + '%' : '–'}</span><span class="s">${bestTop ? esc(bestTop.player) + ' · ' + fmtX(bestTop.afk / a.base) + ' yours' : ''}</span></div>
+        <div class="stat warn"><span class="eyebrow">Close every AFK gap</span><span class="v">${fmtX(a.allGain)}</span><span class="s">AFK gains, and the same factor on the sample</span></div>
+        <div class="stat"><span class="eyebrow">Including gear and obols</span><span class="v">${fmtX(a.fullGain)}</span><span class="s">if the loadout rows (gear, obols, cards, chips) matched too; tick "Show ignored sources" to see them</span></div>
+      </div>
+      <div class="sources"><div class="scroll"><table><thead><tr><th>AFK gains source</th><th class="num">You</th><th class="num">Top-5 median</th><th class="num">Best</th><th class="num">Gain if matched</th><th>Status</th></tr></thead>
+      <tbody>${rowsSorted.map(row).join('')}</tbody></table></div></div></section>`;
+  };
 
   // Render ------------------------------------------------------------------
   const render = () => {
@@ -1074,9 +1154,9 @@ const ICONS = /*__ICONS__*/;
         ${gaps.length ? `<ol>${gaps.slice(0, 5).map((r) => `<li><strong>${rowIcons(r, skill).map((x) => ic(x)).join('')}${esc(displayName(r, skill))}</strong> <span class="src-ctx">${esc(ctxLabel(r.ctx, skill))}</span> · ${fmtX(r.best.gain)} efficiency at ${esc(r.best.player)}'s ${fmt(r.best.value)}${unitLabel(r.unit)} (yours ${fmt(r.value)}${unitLabel(r.unit)})</li>`).join('')}</ol>` : '<p class="lede">No source is behind the top samplers.</p>'}
       </div>
 
-      <div class="versus"><div class="scroll"><table><thead><tr><th>Top sampler</th><th>Character</th><th class="num">${esc(meta.tab)} lv</th><th class="num">Efficiency</th><th class="num">vs yours</th><th class="num">${esc(meta.item)} sample</th></tr></thead><tbody>
-        <tr class="you"><td>You</td><td>${esc(char.name)} · ${esc(pretty(char.cls))}</td><td class="num">${char.skillLv[skill]}</td><td class="num">${fmt(base)}</td><td class="num">1×</td><td class="num">${mySample ? fmt(mySample.value) : '–'}</td></tr>
-        ${players.map((p) => `<tr><td>${esc(p.player)}</td><td>${esc(p.char)} · ${esc(pretty(p.cls))}</td><td class="num">${p.skillLv}</td><td class="num">${fmt(p.eff)}</td><td class="num">${fmtX(p.eff / base)}</td><td class="num">${fmt(p.sample)}</td></tr>`).join('')}
+      <div class="versus"><div class="scroll"><table><thead><tr><th>Top sampler</th><th>Character</th><th class="num">${esc(meta.tab)} lv</th><th class="num">Efficiency</th><th class="num">vs yours</th><th class="num">AFK gains</th><th class="num">${esc(meta.item)} sample</th></tr></thead><tbody>
+        <tr class="you"><td>You</td><td>${esc(char.name)} · ${esc(pretty(char.cls))}</td><td class="num">${char.skillLv[skill]}</td><td class="num">${fmt(base)}</td><td class="num">1×</td><td class="num">${typeof char.afk?.values?.[skill] === 'number' ? fmt(char.afk.values[skill]) + '%' : '–'}</td><td class="num">${mySample ? fmt(mySample.value) : '–'}</td></tr>
+        ${players.map((p) => `<tr><td>${esc(p.player)}</td><td>${esc(p.char)} · ${esc(pretty(p.cls))}</td><td class="num">${p.skillLv}</td><td class="num">${fmt(p.eff)}</td><td class="num">${fmtX(p.eff / base)}</td><td class="num">${typeof p.afk === 'number' ? fmt(p.afk) + '%' : '–'}</td><td class="num">${fmt(p.sample)}</td></tr>`).join('')}
       </tbody></table></div></div>
 
       <div class="sources"><div class="scroll"><table>
@@ -1086,7 +1166,8 @@ const ICONS = /*__ICONS__*/;
           const body = gaps.filter(inSec).map(rowHtml).join('') + (showAhead ? others.filter(inSec).map(rowHtml).join('') : '') + (showIgnored ? ignored.filter(inSec).map(rowHtml).join('') : '');
           return body ? `<tr class="section"><td colspan="6">${esc(title)} <span class="src-ctx">${esc(note)}</span></td></tr>` + body : '';
         }).join('')}</tbody>
-      </table></div></div>`;
+      </table></div></div>
+      ${afkSection(skill, char)}`;
 
     $('charSel').addEventListener('change', (e) => { charChoice[skill] = e.target.value; openRows.clear(); render(); });
     $('showAhead').addEventListener('change', (e) => { showAhead = e.target.checked; render(); });

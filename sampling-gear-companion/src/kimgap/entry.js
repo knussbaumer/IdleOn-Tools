@@ -2,6 +2,7 @@ import '../polyfills';
 import { parseData } from '@parsers/index';
 import { getSkillEfficiency } from '@parsers/efficiency';
 import { getMaxDamage } from '@parsers/damage';
+import { getAfkGain } from '@parsers/character';
 import { evaluateBreakdownNode } from '@parsers/breakdown';
 import { growth } from '@utility/helpers';
 import { getMonumentBonus, getMonumentMultiplier } from '@parsers/world-5/caverns/bravery';
@@ -151,6 +152,17 @@ export const superTalentPlan = (c, characters, account, skill, pi, loadout) => {
   return { bonus, slotsUsed: (v.flatTalents || []).filter((t) => t?.isSuperTalent).length, list: out.concat(extra) };
 };
 
+// AFK gains for each skill, as if the character were AFK on that skill (the sample is 90% of AFK yield).
+const AFK_TYPE = { mining: 'MINING', chopping: 'CHOPPIN', catching: 'CATCHING', fishing: 'FISHING' };
+export const afkTrees = (c, characters, account) => {
+  const trees = {}; const values = {};
+  for (const s of SKILLS) {
+    try { const r = getAfkGain({ ...c, afkType: AFK_TYPE[s] }, characters, account); trees[s] = cleanBreakdown(r?.breakdown); values[s] = r?.afkGains == null ? null : 100 * r.afkGains; }
+    catch (e) { trees[s] = null; values[s] = null; }
+  }
+  return { trees, values };
+};
+
 export const characterTrees = (c, characters, account) => {
   let pi; try { pi = getMaxDamage(c, characters, account); } catch (e) { pi = undefined; }
   const trees = {}; const values = {};
@@ -204,7 +216,8 @@ export const analyzeSave = (raw) => {
       obols: (c.obols?.list || []).map((x) => x?.rawName).filter((x) => x && !/Locked|Blank/.test(x)),
     };
     loadout.talentPreset = c.selectedTalentPreset ?? 0; loadout.cardPreset = c.selectedCardPreset ?? 0;
-    return { loadout, presets, supers, golden, name: c.name, cls: c.class, level: c.level, skillLv: Object.fromEntries(SKILLS.map((s) => [s, c.skillsInfo?.[s]?.level ?? 0])), trees, values, statueVal, inputs };
+    const afk = afkTrees(c, characters, account);
+    return { afk, loadout, presets, supers, golden, name: c.name, cls: c.class, level: c.level, skillLv: Object.fromEntries(SKILLS.map((s) => [s, c.skillsInfo?.[s]?.level ?? 0])), trees, values, statueVal, inputs };
   });
   const h = account?.hole?.holesObject || {};
   const extras = {};
