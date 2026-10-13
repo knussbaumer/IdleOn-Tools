@@ -6,4 +6,4 @@ Compares your 3D Printer sampling characters with the top public samplers for Co
 - Expandable details: what feeds each source, monument, statue and Dragon statue, vials, meals, golden food carry cap, Right Hand of Action, star signs.
 - Best-in-slot setups per skill with hover tooltips, and the fishing spots table.
 
-Build: `scripts/build.sh` (see the root README). No save is embedded; the page starts empty.
+Build: `scripts/build.sh` (see the root README). No save is embedded; the page reads the save imported on the site's Account page and caches the analysis per save.

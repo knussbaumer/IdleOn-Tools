@@ -6,18 +6,15 @@
 <title>Stamp Upgrade Planner</title>
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.5 system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/site.js" data-page="stamps"></script>
 <style>
 /* Layout: one working column — status strip, carry-cap verdicts, then the sortable upgrade table. */
 :root{
-  --bg:#eef1f4; --panel:#ffffff; --ink:#1b2430; --muted:#5d6878; --line:#d5dbe3;
+  --panel:var(--surface); --ink:var(--fg);
   --gold:#a8730c; --gold-soft:#f6ead0; --hydro:#0f7c94; --hydro-soft:#dcf0f4;
   --ok:#1f7a45; --ok-soft:#dcf1e4; --warn:#9a5b00; --warn-soft:#fbecd2; --bad:#b0322e; --bad-soft:#f8dedc;
-  --f-display:"Chakra Petch", "Segoe UI", system-ui, sans-serif;
-  --f-body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-  --f-mono:"IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --f-display:var(--font-display); --f-body:var(--font-body); --f-mono:var(--font-mono);
   --t-material:#2f7f7a; --t-logs:#8a5a2b; --t-leaf:#3f8a2e; --t-ore:#b0612a; --t-bars:#5b6f86; --t-fish:#1f6fb5;
   --t-bugs:#8a8a12; --t-critters:#b05a7a; --t-souls:#7a4fc0; --t-food:#c0442b; --t-gear:#56606e; --t-stone:#6a58a8; --t-other:#7a7062;
   --exalt:#b0389a; --exalt-soft:#f7e1f2;
@@ -26,7 +23,6 @@
   --well:#1f2b3a; --well-edge:#1f2b3a;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#12171e; --panel:#1a212b; --ink:#e4e9f0; --muted:#97a3b3; --line:#2c3644;
   --gold:#e3b04b; --gold-soft:#3a2f17; --hydro:#5cc3d8; --hydro-soft:#15323a;
   --ok:#5fcf8b; --ok-soft:#173326; --warn:#f0b35a; --warn-soft:#3a2b14; --bad:#f07f78; --bad-soft:#3c1d1c;
   --t-material:#5fc4bd; --t-logs:#d39a5c; --t-leaf:#7fcf63; --t-ore:#f09a5a; --t-bars:#a3b6cc; --t-fish:#6ab3f0;
@@ -37,7 +33,6 @@
   --well:#0c1118; --well-edge:#3a4656;
   color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#12171e; --panel:#1a212b; --ink:#e4e9f0; --muted:#97a3b3; --line:#2c3644;
   --gold:#e3b04b; --gold-soft:#3a2f17; --hydro:#5cc3d8; --hydro-soft:#15323a;
   --ok:#5fcf8b; --ok-soft:#173326; --warn:#f0b35a; --warn-soft:#3a2b14; --bad:#f07f78; --bad-soft:#3c1d1c;
   --t-material:#5fc4bd; --t-logs:#d39a5c; --t-leaf:#7fcf63; --t-ore:#f09a5a; --t-bars:#a3b6cc; --t-fish:#6ab3f0;
@@ -47,17 +42,12 @@
   --t-spel:#d8b26a; --t-shop:#98a8f5;
   --well:#0c1118; --well-edge:#3a4656;
   color-scheme:dark}
-*{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5}
-.wrap{max-width:none;margin:0 auto;padding-inline:clamp(16px,2.5vw,40px);padding-block:28px 48px;display:flex;flex-direction:column;gap:28px}
-h1,h2{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:.01em}
-h1{font-size:30px;font-weight:700}
-h2{font-size:20px;font-weight:600}
+.wrap{max-width:none;margin:0 auto;padding-inline:clamp(16px,2.5vw,40px);padding-block:28px 56px;display:flex;flex-direction:column;gap:28px}
+h2{font-size:1.3rem}
 p{margin:0;max-width:72ch}
 .muted{color:var(--muted)}
 .mono,td.num,.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 header{display:flex;flex-direction:column;gap:12px}
-.eyebrow{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;font-size:12px;color:var(--gold);font-weight:600}
 .strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
 .fact{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .fact .k{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
@@ -87,13 +77,14 @@ td .sub{display:block;font-size:12px;color:var(--muted);font-family:var(--f-body
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .seg button{font:inherit;font-size:13px;border:0;background:transparent;color:var(--ink);padding:6px 12px;cursor:pointer;border-right:1px solid var(--line)}
 .seg button:last-child{border-right:0}
-.seg button[aria-pressed="true"]{background:var(--hydro-soft);color:var(--hydro);font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.seg button + button{border-left:0}
 .seg.g button[aria-pressed="true"]{background:var(--gold-soft);color:var(--gold)}
 .ctl{display:flex;align-items:center;gap:8px;font-size:13px}
 .ctl .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
 label.chk{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:13px}
 input[type=search]{font:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-width:0;width:180px}
-button:focus-visible,input:focus-visible,th:focus-visible{outline:2px solid var(--hydro);outline-offset:2px}
+button:focus-visible,input:focus-visible,th:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .path{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
 .path li{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:baseline;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px}
 .path .n{font-family:var(--f-display);font-weight:700;color:var(--gold)}
@@ -104,20 +95,10 @@ button:focus-visible,input:focus-visible,th:focus-visible{outline:2px solid var(
 .ico.sm{width:36px;height:36px}
 .cell{display:flex;gap:10px;align-items:center;min-width:0}
 .cell > span{min-width:0}
-.import{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;display:flex;flex-direction:column;gap:10px}
-.import .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
-.drop{border:1.5px dashed var(--line);border-radius:6px;padding:10px 14px;color:var(--muted);font-size:13px;flex:1 1 260px;min-width:0}
-.drop.over{border-color:var(--hydro);background:var(--hydro-soft);color:var(--hydro)}
-textarea{font-family:var(--f-mono);font-size:12px;width:100%;min-height:90px;resize:vertical;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
-.btn{font:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:6px;border:1px solid var(--hydro);background:var(--hydro);color:var(--panel);cursor:pointer}
-.btn.ghost{background:transparent;color:var(--hydro)}
+.btn{font:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:7px;border:1px solid var(--accent);background:var(--accent);color:var(--bg);cursor:pointer;text-decoration:none}
+.btn.ghost{background:transparent;color:var(--accent)}
 .btn:disabled{opacity:.55;cursor:progress}
-.filebtn{position:relative;overflow:hidden}
-.filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
 .status{font-size:13px;color:var(--muted)} .status.err{color:var(--bad)} .status.ok{color:var(--ok)}
-.source{display:inline-flex;align-items:center;gap:6px}
-details.paste summary{cursor:pointer;font-size:13px;color:var(--hydro);font-weight:600}
-details.paste[open] summary{margin-bottom:8px}
 .flag{font:inherit;font-size:20px;line-height:1;width:30px;height:30px;flex:none;border:0;border-radius:6px;background:transparent;color:var(--muted);cursor:pointer;padding:0}
 .flag:hover{background:var(--gold-soft);color:var(--gold)}
 .flag.on{color:var(--gold)}
@@ -145,13 +126,12 @@ tr.group td{font-family:var(--f-display);font-size:12px;text-transform:uppercase
 .alert-head{display:flex;gap:10px;align-items:center}
 .alert-icon{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--bad);color:var(--panel);font-family:var(--f-display);font-weight:700;flex:none}
 .alert h2{color:var(--bad)}
-.empty{display:flex;flex-direction:column;gap:4px;background:var(--hydro-soft);color:var(--ink);border:1px solid var(--hydro);border-radius:6px;padding:14px}
+.empty{display:flex;flex-direction:column;gap:4px;background:var(--accent-soft);color:var(--ink);border:1px solid var(--accent);border-radius:6px;padding:14px}
 .empty[hidden]{display:none}
-.impbody{display:flex;flex-direction:column;gap:10px}
 .fitcounts{display:flex;flex-wrap:wrap;gap:8px}
 .fitcounts{flex-basis:100%}
 .fc{font:inherit;font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:var(--bg);cursor:pointer}
-.fc:hover{border-color:var(--hydro);color:var(--ink)}
+.fc:hover{border-color:var(--accent);color:var(--ink)}
 .fc b{font-family:var(--f-mono);color:var(--ink);font-weight:600;margin-right:2px}
 .fc.gold b{color:var(--gold)}
 .fc{display:inline-flex;align-items:center;gap:8px}
@@ -161,7 +141,7 @@ tr.group td{font-family:var(--f-display);font-size:12px;text-transform:uppercase
 .fci img.gs{width:24px;height:24px;object-fit:contain;image-rendering:auto}
 .lbl-st{margin-left:-4px}
 .fci img.atom{width:22px;height:22px;object-fit:contain;image-rendering:auto}
-.fc[aria-pressed="true"]{border-color:var(--hydro);background:var(--hydro-soft);color:var(--hydro);font-weight:600}
+.fc[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600}
 input.rate{display:block;margin:0 0 6px auto;text-align:right;width:7.5em;font:inherit;font-family:var(--f-mono);font-size:12px;padding:3px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink)}
 input.rate::placeholder{color:var(--muted);font-family:var(--f-body)}
 input.rate.bad{border-color:var(--bad)}
@@ -170,53 +150,24 @@ td.farm .sub{margin-top:4px}
 .alert-head{flex-wrap:wrap}
 .alert-toggle{margin-left:auto}
 .carry-hidden{display:flex;flex-wrap:wrap;gap:12px;align-items:center;font-size:13px;color:var(--muted);border:1px dashed var(--line);border-radius:6px;padding:8px 12px}
-@media (max-width:560px){h1{font-size:24px}.path li{grid-template-columns:24px 1fr}.path li .num{grid-column:2}}
+@media (max-width:560px){.path li{grid-template-columns:24px 1fr}.path li .num{grid-column:2}}
 </style>
 </head>
 <body>
-<!-- tools-nav: shared menu, kept in sync by scripts/sync-nav.py -->
-<style>
-.tools-nav{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;padding:8px 16px;margin:0;background:#18211d;color:#e3e9e3;font:500 14px/1.3 "IBM Plex Sans","Segoe UI",system-ui,sans-serif}
-.tools-nav a{color:#c9d4cc;text-decoration:none;padding:5px 10px;border-radius:6px}
-.tools-nav a:hover{background:#2a3530;color:#fff}
-.tools-nav a.home{font-weight:700;color:#fff;margin-right:8px;letter-spacing:.01em}
-.tools-nav a[aria-current="page"]{background:#2f6f4a;color:#fff}
-.tools-nav a:focus-visible{outline:2px solid #7cc296;outline-offset:2px}
-</style>
-<nav class="tools-nav" aria-label="IdleOn Tools">
-  <a class="home" href="../">IdleOn Tools</a>
-  <a href="../sampling-gear-companion/">Sampling and Gear Companion</a>
-  <a href="../stamp-planner/" aria-current="page">Stamp Upgrade Planner</a>
-</nav>
-<!-- /tools-nav -->
+<nav id="site-bar"></nav>
 <div class="wrap">
 <header>
   <span class="eyebrow">World 1 · Stamps</span>
   <h1>Stamp Upgrade Planner</h1>
-  <div class="import" aria-labelledby="impH">
-    <div class="row">
-      <strong id="impH">Your save</strong>
-      <span class="source"><span class="pill ok" id="sourcePill"></span></span>
-      <button type="button" class="btn ghost" id="changeBtn" aria-expanded="true" aria-controls="impBody" hidden>Import another save</button>
-      <button type="button" class="btn ghost" id="resetBtn" hidden>Back to built-in save</button>
-    </div>
-    <div id="impBody" class="impbody">
-    <div class="row">
-      <label class="btn filebtn" for="fileIn">Import JSON file<input type="file" id="fileIn" accept=".json,application/json,text/plain"></label>
-      <div class="drop" id="drop">or drop the IdleonToolbox export (.json) here</div>
-    </div>
-    <details class="paste" id="pasteBox">
-      <summary>Paste the file content instead</summary>
-      <textarea id="pasteIn" spellcheck="false" placeholder='{"data": {...}, "charNames": [...], "companion": {...}, ...}' aria-label="Save file content"></textarea>
-      <div class="row" style="margin-top:8px"><button type="button" class="btn" id="pasteBtn">Calculate</button></div>
-    </details>
-    </div>
-    <span class="status" id="status" role="status"></span>
+  <p class="lede">Which stamp upgrades you can afford to carry right now, using the save from your Account page.</p>
+  <div class="save-strip" aria-label="Save in use">
+    <div class="grow"><span id="saveText">Loading…</span> <span class="status" id="status" role="status"></span></div>
+    <a class="btn ghost" href="../account/" id="acctLink">Change save</a>
   </div>
 
   <div class="empty" id="emptyState" hidden>
     <strong>Import your save to start.</strong>
-    <span>Export your account from IdleonToolbox as JSON, then pick the file above, drop it in, or paste its content. Everything is calculated in your browser; the file is not uploaded anywhere.</span>
+    <span>Export your account from IdleonToolbox as JSON and import it once on the <a href="../account/">Account page</a>. Every tool on this site uses it; nothing is uploaded anywhere.</span>
   </div>
   <div class="strip" id="factStrip">
     <div class="fact h"><span class="k">Hydrogen</span><span class="v">+<span id="hPerDay"></span>% / day</span><span class="s">Atom level <span id="hLvl"></span>. Now at <span id="hNow"></span>% (day <span id="hDays"></span>). Cap 90%. Resets on every material upgrade.</span></div>
@@ -281,7 +232,6 @@ td.farm .sub{margin-top:4px}
 (function(){
   const BUILTIN = JSON.parse(document.getElementById('data').textContent);
   const IMG = JSON.parse(document.getElementById('imgs').textContent);
-  const LS_KEY = 'stampPlannerImport';
   const $ = (id) => document.getElementById(id);
   let D = BUILTIN;
 
@@ -404,9 +354,7 @@ td.farm .sub{margin-top:4px}
     const top = mats.find(s => s.cap === maxCap);
     $('bestCarrier').textContent = fmt(maxCap);
     $('bestCarrierSub').textContent = `${top ? top.w.replace(/_/g,' ') : ''}, ${D.meta.slots || 97} slots. Other material types top out lower.`;
-    $('sourcePill').textContent = D.meta.save || 'Imported save';
-    $('resetBtn').hidden = D === BUILTIN;
-    $('resetBtn').textContent = BUILTIN ? 'Back to built-in save' : 'Clear imported save';
+    $('saveText').innerHTML = `<span class="eyebrow">Showing</span><br><strong>${esc(D.meta.save || 'Imported save')}</strong>`;
   }
 
   function renderCarry(){
@@ -510,9 +458,9 @@ td.farm .sub{margin-top:4px}
   $('carryShowBtn').addEventListener('click', () => setCarryOOR(true));
   const renderAll = () => {
     const has = !!(D && D.stamps);
-    $('emptyState').hidden = has;
+    $('emptyState').hidden = has || loading;
     ['factStrip','planSec'].forEach(id => $(id).hidden = !has);
-    if (!has) { $('carrySec').hidden = true; $('carryHidden').hidden = true; $('sourcePill').textContent = 'No save loaded'; $('resetBtn').hidden = true; return; }
+    if (!has) { $('carrySec').hidden = true; $('carryHidden').hidden = true; if (!loading) $('saveText').innerHTML = '<strong>No save loaded yet.</strong>'; return; }
     D.stamps.forEach(s => { if (s.t == null) s.t = TYPE_BY_ITEM[s.ir] || ''; if (s.x == null) s.x = !!EX_BY_STAMP[s.r]; }); renderHeader(); renderCarry(); renderPlan(); };
   document.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-flag]');
@@ -534,54 +482,38 @@ td.farm .sub{margin-top:4px}
     s.onerror = () => { enginePromise = null; rej(new Error('The calculator did not load. Check your connection and try again.')); };
     document.head.appendChild(s);
   });
-  const busy = (on) => ['pasteBtn','fileIn'].forEach(id => $(id).disabled = on);
-
-  // Import panel collapses once a save is loaded; "Import another save" opens it again.
-  const setImportOpen = (open) => {
-    $('impBody').hidden = !open;
-    $('changeBtn').hidden = open || !(D && D.stamps);
-    $('changeBtn').setAttribute('aria-expanded', String(open));
-  };
-  $('changeBtn').addEventListener('click', () => { setImportOpen(true); $('status').textContent = ''; });
-  async function importText(text, label){
-    if (!text || !text.trim()) { setStatus('The file is empty. Pick the JSON export from IdleonToolbox.', 'err'); return; }
-    busy(true);
-    setStatus('Loading the calculator…');
+  // The save comes from the shared Account page (assets/site.js); the result is cached per save.
+  const CACHE_VERSION = 'stamps-v1';
+  let loadSeq = 0;
+  let loading = !!window.IdleonTools;
+  async function loadFromAccount(){
+    const T = window.IdleonTools;
+    const seq = ++loadSeq;
+    const rec = await T.account.getSave();
+    if (seq !== loadSeq) return;
+    loading = false;
+    if (!rec) { D = null; renderAll(); setStatus(''); return; }
+    const cached = await T.cache.get('stamps', rec.id, CACHE_VERSION);
+    if (seq !== loadSeq) return;
+    if (cached && cached.stamps) { D = cached; renderAll(); setStatus(''); return; }
+    $('saveText').innerHTML = `<strong>${esc(rec.label)}</strong>`;
     try {
+      setStatus('Loading the calculator…');
       const engine = await loadEngine();
       setStatus('Calculating stamp costs and carry capacity… this takes a few seconds.');
       await new Promise(r => setTimeout(r, 30));
-      let parsed;
-      try { parsed = JSON.parse(text); } catch (e) { throw new Error('This is not valid JSON. Paste the whole file content, from the first { to the last }.'); }
-      const result = engine.compute(parsed);
-      const stamp = new Date().toLocaleString('de-CH', {dateStyle: 'short', timeStyle: 'short'});
-      result.meta.save = `${label} · imported ${stamp}`;
+      const result = engine.compute(JSON.parse(rec.text));
+      result.meta.save = `${rec.label} · save from ${T.when(rec.lastUpdated)}`;
+      if (seq !== loadSeq) return;
       D = result;
-      try { localStorage.setItem(LS_KEY, JSON.stringify(result)); } catch (e) {}
+      T.cache.set('stamps', rec.id, CACHE_VERSION, result);
       renderAll();
-      setStatus(`Updated from ${label}: ${result.stamps.length} stamps, ${result.meta.chars} characters.`, 'ok');
-      setImportOpen(false);
+      setStatus('');
     } catch (e) {
+      D = null; renderAll();
       setStatus(e.message || String(e), 'err');
-    } finally { busy(false); }
+    }
   }
-  const readFile = (file) => {
-    if (!file) return;
-    const fr = new FileReader();
-    fr.onload = () => importText(String(fr.result), file.name);
-    fr.onerror = () => setStatus('Could not read that file. Try pasting its content instead.', 'err');
-    fr.readAsText(file);
-  };
-  $('fileIn').addEventListener('change', e => { readFile(e.target.files[0]); e.target.value = ''; });
-  const drop = $('drop');
-  ['dragenter','dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
-  ['dragleave','drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
-  drop.addEventListener('drop', e => readFile(e.dataTransfer.files[0]));
-  $('pasteBtn').addEventListener('click', () => importText($('pasteIn').value, 'pasted save'));
-  $('resetBtn').addEventListener('click', () => {
-    D = BUILTIN; try { localStorage.removeItem(LS_KEY); } catch (e) {}
-    renderAll(); setImportOpen(!(D && D.stamps)); setStatus(BUILTIN ? 'Showing the built-in save again.' : 'Imported save cleared.');
-  });
 
   $('planSummary').addEventListener('click', (e) => { const btn = e.target.closest('button[data-k]'); if (btn) { sk = btn.dataset.k; renderPlan(); } });
   ['fReach','fOwned','fExalt'].forEach(id => $(id).addEventListener('change', renderPlan));
@@ -592,9 +524,9 @@ td.farm .sub{margin-top:4px}
     th.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
   });
 
-  try { const saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); if (saved && saved.stamps && saved.meta) D = saved; } catch (e) {}
-  renderAll();
-  setImportOpen(!(D && D.stamps));
+  try { localStorage.removeItem('stampPlannerImport'); } catch (e) {} // old per-tool import, now on the Account page
+  if (window.IdleonTools) { renderAll(); loadFromAccount(); window.IdleonTools.account.onChange(loadFromAccount); }
+  else { $('acctLink').hidden = true; renderAll(); }
 })();
 </script>
 

@@ -4,77 +4,45 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>IdleOn Tools</title>
-<meta name="description" content="Calculators for Legends of IdleOn: 3D Printer sample gaps and stamp upgrade planning. Import your IdleonToolbox save; everything runs in your browser.">
+<meta name="description" content="Calculators for Legends of IdleOn: 3D Printer sample gaps and stamp upgrade planning. Import your IdleonToolbox save once; everything runs in your browser.">
 <link rel="icon" href="assets/StampA34.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="assets/theme.css">
+<script src="assets/site.js" data-page="home"></script>
 <style>
-/* Layout: one column — title block, a card per tool, how to get your save, credits. */
-:root {
-  --bg: #eef1ec; --panel: #ffffff; --sunk: #e3e9e1; --ink: #1b2420; --muted: #5b685f; --line: #d3dbd1;
-  --accent: #2f6f4a; --accent-soft: #dcebe0; --gold: #9a6a0c; --gold-soft: #f4e8cf;
-  --f-display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
-  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #111613; --panel: #18201b; --sunk: #202a23; --ink: #e3e9e3; --muted: #9aa89f; --line: #2c3830;
-    --accent: #7cc296; --accent-soft: #213428; --gold: #e2b155; --gold-soft: #33291a; color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #111613; --panel: #18201b; --sunk: #202a23; --ink: #e3e9e3; --muted: #9aa89f; --line: #2c3830;
-  --accent: #7cc296; --accent-soft: #213428; --gold: #e2b155; --gold-soft: #33291a; color-scheme: dark;
-}
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 var(--f-body); }
-.wrap { max-width: 1040px; margin: 0 auto; padding: 48px 16px 64px; display: grid; gap: 40px; }
-h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; }
-p { margin: 0; }
-a { color: var(--accent); }
-a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
-
-header { display: grid; gap: 12px; }
-.eyebrow { font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; color: var(--muted); }
-h1 { font-size: clamp(2.2rem, 6vw, 3.4rem); font-weight: 700; letter-spacing: -0.01em; line-height: 1.05; }
-.lede { color: var(--muted); max-width: 62ch; font-size: 1.05rem; }
-
-nav.menu { display: flex; flex-wrap: wrap; gap: 8px; }
-nav.menu a { text-decoration: none; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-weight: 500; font-size: 0.92rem; }
-nav.menu a:hover { border-color: var(--accent); color: var(--accent); }
-
+/* Layout: one column — title block, account status, a card per tool, credits. */
+.page { gap: 36px; }
+.lede { font-size: 1.05rem; }
+.acct-card { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.acct-card .grow { flex: 1 1 280px; min-width: 0; display: grid; gap: 2px; }
 .tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
-.tool { position: relative; display: grid; grid-template-rows: auto auto 1fr auto; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px 22px 20px; text-decoration: none; color: inherit; transition: border-color .15s, transform .15s; }
+.tool { display: grid; grid-template-rows: auto auto 1fr auto; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px 22px 20px; text-decoration: none; color: inherit; transition: border-color .15s, transform .15s; }
 .tool:hover { border-color: var(--accent); transform: translateY(-2px); }
 .tool:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .tool .top { display: flex; gap: 14px; align-items: center; }
 .tool .icon { width: 64px; height: 64px; flex: none; display: grid; place-items: center; background: var(--sunk); border-radius: 12px; }
 .tool .icon img { max-width: 48px; max-height: 52px; }
-.tool .tag { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; color: var(--gold); background: var(--gold-soft); border-radius: 999px; padding: 2px 9px; justify-self: start; }
+.tool .tag { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 2px 9px; }
 .tool h2 { font-size: 1.45rem; font-weight: 700; }
 .tool .what { color: var(--muted); }
 .tool ul { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; font-size: 0.93rem; }
 .tool .go { font-weight: 600; color: var(--accent); }
-@media (prefers-reduced-motion: reduce) { .tool { transition: none; } .tool:hover { transform: none; } }
-
-.how { display: grid; gap: 14px; }
-.how ol { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; max-width: 70ch; }
-.how h2 { font-size: 1.25rem; }
 footer { color: var(--muted); font-size: 0.88rem; display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 18px; max-width: 80ch; }
+@media (prefers-reduced-motion: reduce) { .tool:hover { transform: none; } }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
+<nav id="site-bar"></nav>
+<main class="page">
+  <header class="page-head">
     <span class="eyebrow">Legends of IdleOn</span>
     <h1>IdleOn Tools</h1>
-    <p class="lede">Calculators for Legends of IdleOn. Pick a tool, import your IdleonToolbox save, and everything is worked out in your browser. Your save is never uploaded.</p>
-    <nav class="menu" aria-label="Tools">
-      <a href="sampling-gear-companion/">Sampling and Gear Companion</a>
-      <a href="stamp-planner/">Stamp Upgrade Planner</a>
-    </nav>
+    <p class="lede">Calculators for Legends of IdleOn. Import your IdleonToolbox save once on the Account page, then open any tool. Everything is worked out in your browser; your save is never uploaded.</p>
   </header>
+
+  <section class="panel acct-card" aria-label="Your save">
+    <div class="grow" id="acctText"></div>
+    <a class="btn primary" href="account/" id="acctBtn">Import your save</a>
+  </section>
 
   <section class="tools" aria-label="All tools">
     <a class="tool" href="sampling-gear-companion/">
@@ -85,8 +53,8 @@ footer { color: var(--muted); font-size: 0.88rem; display: grid; gap: 6px; borde
       </div>
       <ul>
         <li>Every efficiency source, ranked by how much matching the top player would gain you</li>
-        <li>Breakdowns for monuments, statues, vials, meals, golden food and more</li>
-        <li>Best-in-slot setups with hover details and the fishing spots table</li>
+        <li>AFK gains, the gallery, golden food and super talent priorities</li>
+        <li>Best-in-slot setups, preset checks and the fishing spots table</li>
       </ul>
       <span class="go">Open the Sampling and Gear Companion →</span>
     </a>
@@ -105,19 +73,25 @@ footer { color: var(--muted); font-size: 0.88rem; display: grid; gap: 6px; borde
     </a>
   </section>
 
-  <section class="how" aria-labelledby="howH">
-    <h2 id="howH">Getting your save</h2>
-    <ol>
-      <li>Open <a href="https://idleontoolbox.com/">IdleonToolbox</a> with your account loaded.</li>
-      <li>Export your account data as a JSON file.</li>
-      <li>In any tool, pick the file, drop it on the import box, or paste its content. Each tool remembers your last import in this browser.</li>
-    </ol>
-  </section>
-
   <footer>
     <p>Game data, formulas and the save parser come from <a href="https://github.com/Morta1/IdleonToolbox">IdleonToolbox</a> by Morta1 (GPL-3.0), bundled into each tool. Game icons belong to Lavaflame2 / Legends of IdleOn.</p>
-    <p>Best-in-slot setups in the Sampling and Gear Companion are taken and updated from AlmostPsycho's Sampling Sheet. Source code: <a href="https://github.com/knussbaumer/IdleOn-Tools">github.com/knussbaumer/IdleOn-Tools</a> (GPL-3.0).</p>
+    <p>Best-in-slot setups in the Sampling and Gear Companion are taken and updated from AlmostPsycho's Sampling Sheet. Source code: <a href="https://github.com/rokadrol-haufi/IdleOn-Tools">github.com/rokadrol-haufi/IdleOn-Tools</a> (GPL-3.0).</p>
   </footer>
-</div>
+</main>
+<script>
+(() => {
+  const T = window.IdleonTools;
+  const paint = (m) => {
+    document.getElementById('acctText').innerHTML = m
+      ? `<span class="eyebrow">Save loaded</span><strong>${T.esc(m.label)}</strong><span class="muted">Save from ${T.esc(T.when(m.lastUpdated))}${m.chars ? ' · ' + m.chars + ' characters' : ''}</span>`
+      : '<span class="eyebrow">No save yet</span><strong>Import your save to start</strong><span class="muted">One import on the Account page is used by every tool.</span>';
+    const b = document.getElementById('acctBtn');
+    b.textContent = m ? 'Manage account' : 'Import your save';
+    b.classList.toggle('primary', !m);
+  };
+  paint(T.account.meta());
+  T.account.onChange(paint);
+})();
+</script>
 </body>
 </html>

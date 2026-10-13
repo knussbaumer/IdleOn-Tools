@@ -2,70 +2,22 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Sampling and Gear Companion</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/site.js" data-page="companion"></script>
 <style>
 /* Layout: one working column — import strip, skill tabs, summary of top samplers, then the ranked source table with drill-downs. */
-:root {
-  --bg: #f3f5f1;
-  --surface: #ffffff;
-  --sunk: #e8ece5;
-  --fg: #1c231f;
-  --muted: #5d6a62;
-  --line: #d5dcd3;
-  --accent: #2f6f4a;
-  --accent-soft: #dcebe0;
-  --gap: #a3530f;
-  --gap-soft: #f6e6d4;
-  --ahead: #2f6f4a;
-  --ahead-soft: #e1efe4;
-  --ignored: #8a9690;
-  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
-  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #121714; --surface: #19201c; --sunk: #222b25; --fg: #e3e9e3; --muted: #9aa89f; --line: #2f3a33;
-    --accent: #7cc296; --accent-soft: #23382b; --gap: #f0a35c; --gap-soft: #3a2a1a; --ahead: #7cc296; --ahead-soft: #1f3327; --ignored: #6f7c75;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #121714; --surface: #19201c; --sunk: #222b25; --fg: #e3e9e3; --muted: #9aa89f; --line: #2f3a33;
-  --accent: #7cc296; --accent-soft: #23382b; --gap: #f0a35c; --gap-soft: #3a2a1a; --ahead: #7cc296; --ahead-soft: #1f3327; --ignored: #6f7c75;
-  color-scheme: dark;
-}
-* { box-sizing: border-box; }
-img { image-rendering: auto; }
-[hidden] { display: none !important; }
-html, body { margin: 0; }
-body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.5; padding: 24px 16px 48px; }
-.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 22px; }
-h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
-h1 { font-size: clamp(1.7rem, 4vw, 2.4rem); font-weight: 800; letter-spacing: -0.01em; }
+.wrap { max-width: var(--page-width); margin: 0 auto; padding: 28px 16px 56px; display: grid; gap: 22px; }
+h1 { font-size: clamp(1.7rem, 4vw, 2.4rem); font-weight: 700; }
 h2 { font-size: 1.25rem; font-weight: 600; }
 h3 { font-size: 1.02rem; font-weight: 600; }
-p { margin: 0; }
-.lede { color: var(--muted); max-width: 70ch; }
-.eyebrow { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
-.mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 header.top { display: grid; gap: 8px; }
 
-.import { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
-.import .status { min-width: 0; }
-.import .status strong { font-weight: 600; }
-.import .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-.import.drag { outline: 2px dashed var(--accent); outline-offset: 3px; }
 button, .btn { font: inherit; font-weight: 500; border-radius: 7px; border: 1px solid var(--line); background: var(--sunk); color: var(--fg); padding: 7px 13px; cursor: pointer; }
 button:hover, .btn:hover { border-color: var(--accent); }
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-textarea { width: 100%; min-height: 90px; font-family: var(--font-mono); font-size: 12px; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 7px; padding: 8px; }
-.paste { grid-column: 1 / -1; display: grid; gap: 8px; }
 .err { color: var(--gap); font-weight: 500; }
 
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
@@ -75,7 +27,7 @@ textarea { width: 100%; min-height: 90px; font-family: var(--font-mono); font-si
 .tab[aria-selected="true"] { background: var(--surface); border-color: var(--line); color: var(--fg); margin-bottom: -1px; }
 .tab[aria-selected="true"] .t1 { color: var(--accent); }
 
-.panel { display: grid; gap: 20px; }
+.skillpanel { display: grid; gap: 20px; }
 .controls { display: flex; gap: 14px 22px; flex-wrap: wrap; align-items: end; }
 .field { display: grid; gap: 4px; }
 .field label { font-size: 0.78rem; color: var(--muted); font-weight: 500; }
@@ -199,29 +151,13 @@ details.more > summary { cursor: pointer; color: var(--accent); font-weight: 500
 .notes strong { color: var(--fg); font-weight: 600; }
 
 @media (max-width: 640px) {
-  .import { grid-template-columns: 1fr; }
-  .import .actions { justify-content: flex-start; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
-<!-- tools-nav: shared menu, kept in sync by scripts/sync-nav.py -->
-<style>
-.tools-nav{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;padding:8px 16px;margin:-24px -16px 18px;background:#18211d;color:#e3e9e3;font:500 14px/1.3 "IBM Plex Sans","Segoe UI",system-ui,sans-serif}
-.tools-nav a{color:#c9d4cc;text-decoration:none;padding:5px 10px;border-radius:6px}
-.tools-nav a:hover{background:#2a3530;color:#fff}
-.tools-nav a.home{font-weight:700;color:#fff;margin-right:8px;letter-spacing:.01em}
-.tools-nav a[aria-current="page"]{background:#2f6f4a;color:#fff}
-.tools-nav a:focus-visible{outline:2px solid #7cc296;outline-offset:2px}
-</style>
-<nav class="tools-nav" aria-label="IdleOn Tools">
-  <a class="home" href="../">IdleOn Tools</a>
-  <a href="../sampling-gear-companion/" aria-current="page">Sampling and Gear Companion</a>
-  <a href="../stamp-planner/">Stamp Upgrade Planner</a>
-</nav>
-<!-- /tools-nav -->
 </head>
 <body>
+<nav id="site-bar"></nav>
 <div class="wrap">
   <header class="top">
     <span class="eyebrow">Legends of Idleon · 3D Printer samples</span>
@@ -229,21 +165,13 @@ details.more > summary { cursor: pointer; color: var(--accent); font-weight: 500
     <p class="lede">Every source of skill efficiency for your sampling character, next to the five best public samplers on the IdleonToolbox leaderboard. Rows are ranked by how much your efficiency would rise if that one source matched the best of them. Gear, cards, card sets, lab chips, obols, armor-set bonuses and tools are set aside, because they change with your loadout.</p>
   </header>
 
-  <section class="import" id="importBox" aria-label="Import save">
-    <div class="status" id="importStatus">Loading…</div>
-    <div class="actions">
-      <label class="btn" for="fileInput">Import save file</label>
-      <input type="file" id="fileInput" accept=".json,application/json" hidden>
-      <button type="button" id="pasteToggle">Paste JSON</button>
-    </div>
-    <div class="paste" id="pasteBox" hidden>
-      <textarea id="pasteArea" placeholder="Paste the save JSON you copied from Idleon Toolbox or the Steam/web save export"></textarea>
-      <div><button type="button" class="primary" id="pasteGo">Analyze pasted save</button></div>
-    </div>
+  <section class="save-strip" id="importBox" aria-label="Save in use">
+    <div class="grow" id="importStatus">Loading…</div>
+    <a class="btn acct-link" href="../account/" id="acctLink">Change save</a>
   </section>
 
   <nav class="tabs" role="tablist" id="tabs"></nav>
-  <main class="panel" id="panel"></main>
+  <main class="skillpanel" id="panel"></main>
 
   <section class="notes" aria-label="How to read this">
     <span class="eyebrow">How to read this</span>
@@ -330,7 +258,6 @@ const ICONS = {"aUpgradesO2":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIA
     fishing: { tab: 'Fishing', sub: 'Goldfish · Blood Berserkers', item: 'Goldfish', family: ['Barbarian', 'Blood_Berserker', 'Death_Bringer'] },
   };
   const SKILL_ORDER = ['mining', 'chopping', 'catching', 'fishing'];
-  const STORE_KEY = 'sampling-gear-companion:analysis:v4';
   const IGNORE = [
     { re: /^Gear$/, why: 'Gear' },
     { re: /^Obols$/, why: 'Obols' },
@@ -411,51 +338,44 @@ const ICONS = {"aUpgradesO2":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIA
 
   const setStatus = (html) => { $('importStatus').innerHTML = html; };
   const describeSource = () => {
-    if (!analysis) return '<span class="err">No save loaded yet.</span> Import your save JSON to see your gaps.';
+    if (!analysis) return '<span class="err">No save loaded yet.</span> Import your save on the <a href="../account/">Account page</a> and it shows up here.';
     const when = analysis.lastUpdated ? new Date(analysis.lastUpdated).toLocaleString('de-CH', { dateStyle: 'medium', timeStyle: 'short' }) : 'unknown time';
     return `<span class="eyebrow">Showing</span><br><strong>${esc(source)}</strong> · save from ${esc(when)} · ${analysis.chars.length} characters`;
   };
 
-  const loadAnalysis = (a, label, persist) => {
+  const loadAnalysis = (a, label) => {
     analysis = a; source = label;
     for (const k of Object.keys(charChoice)) delete charChoice[k];
     openRows.clear();
-    if (persist) { try { localStorage.setItem(STORE_KEY, JSON.stringify({ a, label })); } catch (e) {} }
     setStatus(describeSource());
     render();
   };
 
-  const analyzeRaw = (text, label) => {
-    setStatus('Reading the save… this takes a couple of seconds.');
-    setTimeout(() => {
-      try {
-        const raw = JSON.parse(text);
-        if (!raw || !(raw.data || raw.charNames)) throw new Error('This JSON does not look like an Idleon save. It should have "data" and "charNames" at the top.');
-        const a = KimGap.analyzeSave(raw);
-        if (!a.chars.length) throw new Error('No characters were found in this save.');
-        loadAnalysis(a, label, true);
-      } catch (e) {
-        setStatus(`<span class="err">Could not read that save.</span> ${esc(e.message || e)} ${analysis ? '<br>Still showing the previous save.' : ''}`);
-      }
-    }, 30);
+  // The save comes from the shared Account page (assets/site.js). The analysis takes ~10 s, so it is cached per save.
+  const CACHE_VERSION = 'v4-' + BENCH.createdAt;
+  let loadSeq = 0;
+  const loadFromAccount = async () => {
+    const T = window.IdleonTools;
+    const seq = ++loadSeq;
+    const rec = await T.account.getSave();
+    if (seq !== loadSeq) return;
+    if (!rec) { analysis = null; setStatus(describeSource()); render(); return; }
+    const cached = await T.cache.get('companion', rec.id, CACHE_VERSION);
+    if (seq !== loadSeq) return;
+    if (cached && cached.chars) { loadAnalysis(cached, rec.label); return; }
+    setStatus(`Working through <strong>${esc(rec.label)}</strong>… this takes about ten seconds the first time.`);
+    await new Promise((r) => setTimeout(r, 40));
+    try {
+      const a = KimGap.analyzeSave(JSON.parse(rec.text));
+      if (!a.chars.length) throw new Error('No characters were found in this save.');
+      if (seq !== loadSeq) return;
+      T.cache.set('companion', rec.id, CACHE_VERSION, a);
+      loadAnalysis(a, rec.label);
+    } catch (e) {
+      analysis = null; render();
+      setStatus(`<span class="err">Could not read that save.</span> ${esc(e.message || e)} Try importing it again on the <a href="../account/">Account page</a>.`);
+    }
   };
-
-  // Import wiring -------------------------------------------------------------
-  $('fileInput').addEventListener('change', (ev) => {
-    const f = ev.target.files && ev.target.files[0];
-    if (!f) return;
-    const r = new FileReader();
-    r.onload = () => analyzeRaw(String(r.result), f.name);
-    r.onerror = () => setStatus('<span class="err">The file could not be read.</span> Try exporting it again.');
-    r.readAsText(f);
-    ev.target.value = '';
-  });
-  $('pasteToggle').addEventListener('click', () => { $('pasteBox').hidden = !$('pasteBox').hidden; if (!$('pasteBox').hidden) $('pasteArea').focus(); });
-  $('pasteGo').addEventListener('click', () => { const t = $('pasteArea').value.trim(); if (!t) { setStatus('<span class="err">The paste box is empty.</span> Paste your save JSON first.'); return; } analyzeRaw(t, 'Pasted save'); $('pasteArea').value = ''; $('pasteBox').hidden = true; });
-  const box = $('importBox');
-  ['dragenter', 'dragover'].forEach((t) => box.addEventListener(t, (e) => { e.preventDefault(); box.classList.add('drag'); }));
-  ['dragleave', 'drop'].forEach((t) => box.addEventListener(t, (e) => { e.preventDefault(); box.classList.remove('drag'); }));
-  box.addEventListener('drop', (e) => { const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => analyzeRaw(String(r.result), f.name); r.readAsText(f); });
 
   // Tabs --------------------------------------------------------------------
   const renderTabs = () => {
@@ -1397,10 +1317,9 @@ const ICONS = {"aUpgradesO2":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIA
 
   // Boot ----------------------------------------------------------------------
   $('benchDate').textContent = new Date(BENCH.createdAt).toLocaleDateString('de-CH', { dateStyle: 'long' });
-  let restored = null;
-  try { const s = localStorage.getItem(STORE_KEY); if (s) restored = JSON.parse(s); } catch (e) { restored = null; }
-  if (restored && restored.a && restored.a.chars) loadAnalysis(restored.a, restored.label || 'Your last imported save', false);
-  else if (PRELOADED) loadAnalysis(PRELOADED, 'Built-in save', false);
+  try { localStorage.removeItem('sampling-gear-companion:analysis:v4'); } catch (e) {} // old per-tool import, now on the Account page
+  if (window.IdleonTools) { loadFromAccount(); window.IdleonTools.account.onChange(loadFromAccount); }
+  else if (PRELOADED) { $('acctLink').hidden = true; loadAnalysis(PRELOADED, 'Built-in save'); }
   else { setStatus(describeSource()); render(); }
 })();
 </script>

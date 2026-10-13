@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Account · IdleOn Tools</title>
+<meta name="description" content="Import your Legends of IdleOn save once; every IdleOn Tools page reads it from here.">
+<link rel="icon" href="../assets/classes/14.png">
+<link rel="stylesheet" href="../assets/theme.css">
+<script src="../assets/site.js" data-page="account"></script>
+<style>
+/* Layout: page head, the save panel (summary + characters or the import box), then display settings. */
+.drop { display: grid; gap: 14px; justify-items: start; border: 2px dashed var(--line); border-radius: var(--radius); padding: 20px; background: var(--bg); }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.drop ol { margin: 0; padding-left: 1.3em; display: grid; gap: 4px; color: var(--muted); max-width: 70ch; }
+textarea { width: 100%; min-height: 120px; font: 13px/1.4 var(--font-mono); background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; resize: vertical; }
+details.paste { width: 100%; }
+details.paste summary { cursor: pointer; color: var(--accent); font-weight: 500; }
+details.paste[open] summary { margin-bottom: 8px; }
+.status { min-height: 1.5em; }
+.status .err { color: var(--gap); font-weight: 500; }
+.status .ok { color: var(--ahead); font-weight: 500; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.fact { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
+.fact .k { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.fact .v { font-family: var(--font-display); font-weight: 600; font-size: 1.1rem; overflow-wrap: anywhere; }
+.chars { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+.char { display: grid; grid-template-columns: 40px 1fr; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); min-width: 0; }
+.char img { width: 38px; height: 36px; object-fit: contain; }
+.char .n { font-weight: 600; overflow-wrap: anywhere; }
+.char .c { font-size: 0.86rem; color: var(--muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.confirm { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--gap-soft); border-radius: 8px; padding: 8px 12px; }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; }
+.theme-row { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; }
+</style>
+</head>
+<body>
+<nav id="site-bar"></nav>
+<main class="page">
+  <header class="page-head">
+    <span class="eyebrow">Legends of IdleOn · Your account</span>
+    <h1>Account</h1>
+    <p class="lede">Import your save once here. Every tool on this site reads it from this page, so you never import it twice, and new tools will pick it up too. The save stays in this browser and is never uploaded.</p>
+  </header>
+
+  <section class="panel" aria-labelledby="saveH">
+    <h2 id="saveH">Your save</h2>
+    <div id="loaded" hidden>
+      <div style="display:grid;gap:14px">
+        <div class="facts" id="facts"></div>
+        <div class="chars" id="chars"></div>
+        <div class="actions" id="actions">
+          <button type="button" class="btn" id="replaceBtn">Import a newer save</button>
+          <button type="button" class="btn danger" id="removeBtn">Remove save</button>
+          <span class="muted" style="font-size:.9rem">Open a tool:</span>
+          <span class="tools">
+            <a class="btn" href="../sampling-gear-companion/">Sampling and Gear Companion</a>
+            <a class="btn" href="../stamp-planner/">Stamp Upgrade Planner</a>
+          </span>
+        </div>
+        <div class="confirm" id="confirm" hidden>
+          <span>Remove the save from this browser? The tools will be empty until you import again.</span>
+          <button type="button" class="btn danger" id="confirmYes">Remove</button>
+          <button type="button" class="btn" id="confirmNo">Keep it</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="drop" id="drop" hidden>
+      <ol>
+        <li>Open <a href="https://idleontoolbox.com/" target="_blank" rel="noopener">IdleonToolbox</a> with your account loaded.</li>
+        <li>Export your account data as JSON (a file, or copied to the clipboard).</li>
+        <li>Pick the file, drop it on this box, or paste its content below.</li>
+      </ol>
+      <div class="row">
+        <label class="btn primary" for="fileIn">Choose save file</label>
+        <input type="file" id="fileIn" accept=".json,application/json" hidden>
+        <span class="muted">or drop the .json file here</span>
+        <button type="button" class="btn" id="cancelBtn" hidden>Cancel</button>
+      </div>
+      <details class="paste" id="pasteBox">
+        <summary>Paste the JSON instead</summary>
+        <textarea id="pasteIn" spellcheck="false" placeholder='{"data": {...}, "charNames": [...], ...}' aria-label="Save file content"></textarea>
+        <div style="margin-top:8px"><button type="button" class="btn primary" id="pasteBtn">Use pasted save</button></div>
+      </details>
+    </div>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="panel" aria-labelledby="themeH">
+    <h2 id="themeH">Appearance</h2>
+    <div class="theme-row">
+      <div class="seg" role="group" aria-label="Colour theme">
+        <button type="button" data-t="light">Light</button>
+        <button type="button" data-t="dark">Dark</button>
+        <button type="button" data-t="auto">Auto</button>
+      </div>
+      <span class="muted" id="themeNote"></span>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="storeH">
+    <h2 id="storeH">Where your save is kept</h2>
+    <p class="muted">In this browser's own storage for this site. Other browsers and devices don't see it, and clearing site data removes it. Each tool keeps its finished calculations next to the save, so opening a tool again is instant until you import a newer save.</p>
+  </section>
+</main>
+<script>
+(() => {
+  const T = window.IdleonTools;
+  const $ = (id) => document.getElementById(id);
+  const esc = T.esc;
+  // Class index → name, from IdleonToolbox shared-data "classes".
+  const CLASSES = ['0','Beginner','Journeyman','Maestro','Voidwalker','Infinilyte','Rage_Basics','Warrior','Barbarian','Squire','Blood_Berserker','Nope','Divine_Knight','Nope','Death_Bringer','Filler','Royal_Guardian','Filler','Calm_Basics','Archer','Bowman','Hunter','Siege_Breaker','Nope','Nope','Beast_Master','Filler','Filler','Filler','Wind_Walker','Savvy_Basics','Mage','Wizard','Shaman','Elemental_Sorcerer','Spiritual_Monk','Bubonic_Conjuror','Nope','Filler','Filler','Arcane_Cultist'];
+  const ICONS = new Set([1,2,3,4,5,7,8,9,10,12,14,16,19,20,21,22,25,29,31,32,33,34,35,36,40]);
+  const num = (v) => (typeof v === 'string' ? Number(v) : v);
+  const arr = (v) => { if (typeof v === 'string') { try { return JSON.parse(v); } catch (e) { return null; } } return v; };
+
+  const summarize = (raw) => {
+    const d = raw.data || {};
+    const names = raw.charNames || [];
+    return {
+      chars: names.map((name, i) => {
+        const cls = num(d['CharacterClass_' + i]);
+        const lv = arr(d['Lv0_' + i]);
+        return { name, cls, className: String(CLASSES[cls] || 'Unknown').replace(/_/g, ' '), level: Array.isArray(lv) ? num(lv[0]) : null };
+      }),
+    };
+  };
+
+  const setStatus = (html) => { $('status').innerHTML = html; };
+  let importing = false;
+
+  const showImport = (open) => { $('drop').hidden = !open; $('cancelBtn').hidden = !(open && T.account.meta()); };
+
+  const render = async () => {
+    const rec = await T.account.getSave();
+    $('loaded').hidden = !rec;
+    $('confirm').hidden = true; $('actions').hidden = false;
+    if (!rec) { showImport(true); return; }
+    showImport(false);
+    const s = rec.summary || {};
+    const chars = s.chars || [];
+    const fact = (k, v) => `<div class="fact"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+    $('facts').innerHTML =
+      fact('Save', esc(rec.label)) +
+      fact('Save from', esc(T.when(rec.lastUpdated))) +
+      fact('Imported', esc(T.when(rec.importedAt))) +
+      fact('Characters', chars.length + ' · ' + (rec.text.length / 1024).toFixed(0) + ' KB');
+    $('chars').innerHTML = chars.map((c) => `<div class="char">${ICONS.has(c.cls) ? `<img src="../assets/classes/${c.cls}.png" alt="">` : '<span></span>'}<div style="min-width:0"><div class="n">${esc(c.name)}</div><div class="c">${esc(c.className)}${c.level ? ' · Lv\u00a0' + c.level.toLocaleString('en-US') : ''}</div></div></div>`).join('');
+  };
+
+  const importText = async (text, label) => {
+    if (importing) return;
+    text = String(text || '').trim();
+    if (!text) { setStatus('<span class="err">The paste box is empty.</span> Paste your save JSON first.'); return; }
+    importing = true;
+    setStatus('Reading the save…');
+    try {
+      let raw;
+      try { raw = JSON.parse(text); } catch (e) { throw new Error('That is not valid JSON. Copy the whole export and try again.'); }
+      const summary = raw && raw.charNames ? summarize(raw) : null;
+      await T.account.setSave(text, label, summary);
+      $('pasteIn').value = ''; $('pasteBox').open = false;
+      await render();
+      setStatus(`<span class="ok">Save imported.</span> ${summary ? summary.chars.length + ' characters.' : ''} The tools will use it the next time they open.`);
+    } catch (e) {
+      setStatus(`<span class="err">Could not import that save.</span> ${esc(e.message || e)}`);
+    } finally { importing = false; }
+  };
+  const readFile = (f) => {
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => importText(String(r.result), f.name);
+    r.onerror = () => setStatus('<span class="err">The file could not be read.</span> Try exporting it again.');
+    r.readAsText(f);
+  };
+
+  $('fileIn').addEventListener('change', (e) => { readFile(e.target.files[0]); e.target.value = ''; });
+  const drop = $('drop');
+  ['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', (e) => readFile(e.dataTransfer && e.dataTransfer.files[0]));
+  $('pasteBtn').addEventListener('click', () => importText($('pasteIn').value, 'Pasted save'));
+  $('replaceBtn').addEventListener('click', () => { showImport(true); setStatus(''); });
+  $('cancelBtn').addEventListener('click', () => { showImport(false); setStatus(''); });
+  $('removeBtn').addEventListener('click', () => { $('confirm').hidden = false; $('actions').hidden = true; });
+  $('confirmNo').addEventListener('click', () => { $('confirm').hidden = true; $('actions').hidden = false; });
+  $('confirmYes').addEventListener('click', async () => { await T.account.clearSave(); await render(); setStatus('Save removed from this browser.'); });
+  T.account.onChange(() => { if (!importing) render(); });
+
+  // Theme switch
+  const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  const paintTheme = () => {
+    const t = T.theme.get();
+    document.querySelectorAll('.seg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.t === t)));
+    $('themeNote').textContent = t === 'auto' ? `Auto follows your system setting (${mq && mq.matches ? 'dark' : 'light'} right now).` : `Always ${t}, on every page of this site.`;
+  };
+  document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => { T.theme.set(b.dataset.t); paintTheme(); }));
+  if (mq && mq.addEventListener) mq.addEventListener('change', paintTheme);
+  paintTheme();
+  render();
+})();
+</script>
+</body>
+</html>

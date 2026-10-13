@@ -1,7 +1,7 @@
 """Assemble index.html from src/template.html, the bundled parser and the data files.
 
 The top-sampler benchmarks (data/bench*.json) are a snapshot of public IdleonToolbox profiles.
-No personal save is embedded: the page starts empty and the user imports their own.
+No personal save is embedded: the page reads the save imported on the Account page (assets/site.js).
 
 Usage: python3 scripts/assemble.py <sampling-gear-companion dir>
 """
@@ -23,6 +23,9 @@ parts = [
 for key, value in parts:
     assert key in t, key
     t = t.replace(key, value, 1)
-t = '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n' + t.replace('<div class="wrap">', '</head>\n<body>\n<div class="wrap">', 1) + '\n</body>\n</html>\n'
+assert '<nav id="site-bar"></nav>' in t
+t = ('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
+     '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
+     + t.replace('<nav id="site-bar"></nav>', '</head>\n<body>\n<nav id="site-bar"></nav>', 1) + '\n</body>\n</html>\n')
 open(os.path.join(root, 'index.html'), 'w', encoding='utf-8').write(t)
 print('index.html', round(len(t) / 1e6, 2), 'MB')

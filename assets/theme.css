@@ -1,0 +1,103 @@
+/* IdleOn Tools · shared "Arcade" theme.
+   Every page loads this file and assets/site.js. Colours are tokens; dark mode follows the system setting
+   unless the Account page sets data-theme="light" or "dark" on <html>. */
+@import url("https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
+:root {
+  --bg: #eef1f4;
+  --surface: #ffffff;
+  --sunk: #e4e9ef;
+  --fg: #1b2430;
+  --muted: #5d6878;
+  --line: #d5dbe3;
+  --accent: #0f7c94;
+  --accent-soft: #dcf0f4;
+  --gap: #b0322e;
+  --gap-soft: #f8dedc;
+  --ahead: #1f7a45;
+  --ahead-soft: #dcf1e4;
+  --ignored: #8a94a3;
+  --bar: #16202c;
+  --bar-fg: #c8d3e0;
+  --bar-hover: #24303f;
+  --bar-active: #0f7c94;
+  --bar-focus: #3fc1da;
+  --font-display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --radius: 6px;
+  --page-width: 1180px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141b; --surface: #171e28; --sunk: #1f2834; --fg: #e2e8f0; --muted: #94a2b5; --line: #2a3442;
+    --accent: #3fc1da; --accent-soft: #143440; --gap: #f07a6c; --gap-soft: #3a1d1b; --ahead: #5fd08e; --ahead-soft: #173826; --ignored: #6c7889;
+    --bar: #0a0e14; --bar-fg: #b9c5d4; --bar-hover: #18212d; --bar-active: #0f7c94;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141b; --surface: #171e28; --sunk: #1f2834; --fg: #e2e8f0; --muted: #94a2b5; --line: #2a3442;
+  --accent: #3fc1da; --accent-soft: #143440; --gap: #f07a6c; --gap-soft: #3a1d1b; --ahead: #5fd08e; --ahead-soft: #173826; --ignored: #6c7889;
+  --bar: #0a0e14; --bar-fg: #b9c5d4; --bar-hover: #18212d; --bar-active: #0f7c94;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+img { max-width: 100%; }
+table { color: inherit; font: inherit; }
+a { color: var(--accent); }
+
+/* Shared top bar (filled by site.js into <nav id="site-bar">) */
+#site-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px; background: var(--bar); color: var(--bar-fg); font: 500 14px/1.3 var(--font-body); }
+#site-bar a { color: var(--bar-fg); text-decoration: none; padding: 6px 10px; border-radius: 7px; }
+#site-bar a:hover { background: var(--bar-hover); color: #fff; }
+#site-bar a.home { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.02em; color: #fff; margin-right: 6px; font-size: 15px; }
+#site-bar a[aria-current="page"] { background: var(--bar-active); color: #fff; }
+#site-bar a:focus-visible { outline: 2px solid var(--bar-focus); outline-offset: 2px; }
+#site-bar .spacer { flex: 1 1 auto; }
+#site-bar a.acct { display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(255, 255, 255, 0.16); }
+#site-bar a.acct .dot { width: 8px; height: 8px; border-radius: 50%; background: #e9a05c; flex: none; }
+#site-bar a.acct.loaded .dot { background: #5fd08e; }
+
+/* Page frame */
+.page { max-width: var(--page-width); margin: 0 auto; padding: 28px 16px 56px; display: grid; gap: 24px; }
+.page-head { display: grid; gap: 8px; }
+.eyebrow { font-family: var(--font-display); font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); font-weight: 600; }
+h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; letter-spacing: 0.01em; }
+h1 { font-size: clamp(1.8rem, 4vw, 2.5rem); font-weight: 700; letter-spacing: 0.01em; line-height: 1.1; }
+h2 { font-size: 1.3rem; font-weight: 600; }
+h3 { font-size: 1.05rem; font-weight: 600; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 70ch; }
+.muted { color: var(--muted); }
+.mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* Building blocks */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; display: grid; gap: 12px; min-width: 0; }
+.btn, button.btn { font: 500 0.92rem/1.2 var(--font-body); border-radius: 7px; border: 1px solid var(--line); background: var(--sunk); color: var(--fg); padding: 8px 14px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.btn.danger { color: var(--gap); }
+.btn:focus-visible, button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pill { display: inline-block; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.03em; border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.pill.gap { background: var(--gap-soft); color: var(--gap); }
+.pill.ahead, .pill.ok { background: var(--ahead-soft); color: var(--ahead); }
+.pill.even { background: var(--sunk); color: var(--muted); }
+
+/* Save strip shown at the top of every tool */
+.save-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; }
+.save-strip .grow { flex: 1 1 260px; min-width: 0; }
+.save-strip .err { color: var(--gap); font-weight: 500; }
+
+/* Segmented control (theme switch) */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { font: 500 0.9rem/1 var(--font-body); border: 0; background: none; color: var(--fg); padding: 8px 16px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

@@ -2,7 +2,7 @@
 
 A single-page tool for [Legends of IdleOn](https://www.legendsofidleon.com/) that shows which stamp upgrades you can actually do: the material cost of each stamp's next max-level upgrade, checked against the most any one of your characters can carry of that material.
 
-**Live page:** https://knussbaumer.github.io/IdleOn-Tools/stamp-planner/
+**Live page:** https://rokadrol-haufi.github.io/IdleOn-Tools/stamp-planner/
 
 ## What it shows
 
@@ -14,9 +14,9 @@ A single-page tool for [Legends of IdleOn](https://www.legendsofidleon.com/) tha
 ## Using it
 
 1. Export your account from [IdleonToolbox](https://idleontoolbox.com/) as JSON.
-2. Open the page and pick, drop or paste the file.
+2. Import it once on the site's [Account page](../account/); the planner reads it from there.
 
-Everything runs in your browser. The save is never uploaded; the last import and your priority flags are kept in your browser's local storage.
+Everything runs in your browser. The save is never uploaded; the save, the calculated result and your priority flags are kept in your browser's storage.
 
 ## How it works
 

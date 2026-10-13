@@ -1,46 +1,17 @@
-<!-- tools-nav: shared menu, kept in sync by scripts/sync-nav.py -->
-<style>
-.tools-nav{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;padding:8px 16px;margin:0;background:#18211d;color:#e3e9e3;font:500 14px/1.3 "IBM Plex Sans","Segoe UI",system-ui,sans-serif}
-.tools-nav a{color:#c9d4cc;text-decoration:none;padding:5px 10px;border-radius:6px}
-.tools-nav a:hover{background:#2a3530;color:#fff}
-.tools-nav a.home{font-weight:700;color:#fff;margin-right:8px;letter-spacing:.01em}
-.tools-nav a[aria-current="page"]{background:#2f6f4a;color:#fff}
-.tools-nav a:focus-visible{outline:2px solid #7cc296;outline-offset:2px}
-</style>
-<nav class="tools-nav" aria-label="IdleOn Tools">
-  <a class="home" href="../">IdleOn Tools</a>
-  <a href="../sampling-gear-companion/">Sampling and Gear Companion</a>
-  <a href="../stamp-planner/" aria-current="page">Stamp Upgrade Planner</a>
-</nav>
-<!-- /tools-nav -->
+<nav id="site-bar"></nav>
 <div class="wrap">
 <header>
   <span class="eyebrow">World 1 · Stamps</span>
   <h1>Stamp Upgrade Planner</h1>
-  <div class="import" aria-labelledby="impH">
-    <div class="row">
-      <strong id="impH">Your save</strong>
-      <span class="source"><span class="pill ok" id="sourcePill"></span></span>
-      <button type="button" class="btn ghost" id="changeBtn" aria-expanded="true" aria-controls="impBody" hidden>Import another save</button>
-      <button type="button" class="btn ghost" id="resetBtn" hidden>Back to built-in save</button>
-    </div>
-    <div id="impBody" class="impbody">
-    <div class="row">
-      <label class="btn filebtn" for="fileIn">Import JSON file<input type="file" id="fileIn" accept=".json,application/json,text/plain"></label>
-      <div class="drop" id="drop">or drop the IdleonToolbox export (.json) here</div>
-    </div>
-    <details class="paste" id="pasteBox">
-      <summary>Paste the file content instead</summary>
-      <textarea id="pasteIn" spellcheck="false" placeholder='{"data": {...}, "charNames": [...], "companion": {...}, ...}' aria-label="Save file content"></textarea>
-      <div class="row" style="margin-top:8px"><button type="button" class="btn" id="pasteBtn">Calculate</button></div>
-    </details>
-    </div>
-    <span class="status" id="status" role="status"></span>
+  <p class="lede">Which stamp upgrades you can afford to carry right now, using the save from your Account page.</p>
+  <div class="save-strip" aria-label="Save in use">
+    <div class="grow"><span id="saveText">Loading…</span> <span class="status" id="status" role="status"></span></div>
+    <a class="btn ghost" href="../account/" id="acctLink">Change save</a>
   </div>
 
   <div class="empty" id="emptyState" hidden>
     <strong>Import your save to start.</strong>
-    <span>Export your account from IdleonToolbox as JSON, then pick the file above, drop it in, or paste its content. Everything is calculated in your browser; the file is not uploaded anywhere.</span>
+    <span>Export your account from IdleonToolbox as JSON and import it once on the <a href="../account/">Account page</a>. Every tool on this site uses it; nothing is uploaded anywhere.</span>
   </div>
   <div class="strip" id="factStrip">
     <div class="fact h"><span class="k">Hydrogen</span><span class="v">+<span id="hPerDay"></span>% / day</span><span class="s">Atom level <span id="hLvl"></span>. Now at <span id="hNow"></span>% (day <span id="hDays"></span>). Cap 90%. Resets on every material upgrade.</span></div>
@@ -105,7 +76,6 @@
 (function(){
   const BUILTIN = JSON.parse(document.getElementById('data').textContent);
   const IMG = JSON.parse(document.getElementById('imgs').textContent);
-  const LS_KEY = 'stampPlannerImport';
   const $ = (id) => document.getElementById(id);
   let D = BUILTIN;
 
@@ -228,9 +198,7 @@
     const top = mats.find(s => s.cap === maxCap);
     $('bestCarrier').textContent = fmt(maxCap);
     $('bestCarrierSub').textContent = `${top ? top.w.replace(/_/g,' ') : ''}, ${D.meta.slots || 97} slots. Other material types top out lower.`;
-    $('sourcePill').textContent = D.meta.save || 'Imported save';
-    $('resetBtn').hidden = D === BUILTIN;
-    $('resetBtn').textContent = BUILTIN ? 'Back to built-in save' : 'Clear imported save';
+    $('saveText').innerHTML = `<span class="eyebrow">Showing</span><br><strong>${esc(D.meta.save || 'Imported save')}</strong>`;
   }
 
   function renderCarry(){
@@ -334,9 +302,9 @@
   $('carryShowBtn').addEventListener('click', () => setCarryOOR(true));
   const renderAll = () => {
     const has = !!(D && D.stamps);
-    $('emptyState').hidden = has;
+    $('emptyState').hidden = has || loading;
     ['factStrip','planSec'].forEach(id => $(id).hidden = !has);
-    if (!has) { $('carrySec').hidden = true; $('carryHidden').hidden = true; $('sourcePill').textContent = 'No save loaded'; $('resetBtn').hidden = true; return; }
+    if (!has) { $('carrySec').hidden = true; $('carryHidden').hidden = true; if (!loading) $('saveText').innerHTML = '<strong>No save loaded yet.</strong>'; return; }
     D.stamps.forEach(s => { if (s.t == null) s.t = TYPE_BY_ITEM[s.ir] || ''; if (s.x == null) s.x = !!EX_BY_STAMP[s.r]; }); renderHeader(); renderCarry(); renderPlan(); };
   document.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-flag]');
@@ -358,54 +326,38 @@
     s.onerror = () => { enginePromise = null; rej(new Error('The calculator did not load. Check your connection and try again.')); };
     document.head.appendChild(s);
   });
-  const busy = (on) => ['pasteBtn','fileIn'].forEach(id => $(id).disabled = on);
-
-  // Import panel collapses once a save is loaded; "Import another save" opens it again.
-  const setImportOpen = (open) => {
-    $('impBody').hidden = !open;
-    $('changeBtn').hidden = open || !(D && D.stamps);
-    $('changeBtn').setAttribute('aria-expanded', String(open));
-  };
-  $('changeBtn').addEventListener('click', () => { setImportOpen(true); $('status').textContent = ''; });
-  async function importText(text, label){
-    if (!text || !text.trim()) { setStatus('The file is empty. Pick the JSON export from IdleonToolbox.', 'err'); return; }
-    busy(true);
-    setStatus('Loading the calculator…');
+  // The save comes from the shared Account page (assets/site.js); the result is cached per save.
+  const CACHE_VERSION = 'stamps-v1';
+  let loadSeq = 0;
+  let loading = !!window.IdleonTools;
+  async function loadFromAccount(){
+    const T = window.IdleonTools;
+    const seq = ++loadSeq;
+    const rec = await T.account.getSave();
+    if (seq !== loadSeq) return;
+    loading = false;
+    if (!rec) { D = null; renderAll(); setStatus(''); return; }
+    const cached = await T.cache.get('stamps', rec.id, CACHE_VERSION);
+    if (seq !== loadSeq) return;
+    if (cached && cached.stamps) { D = cached; renderAll(); setStatus(''); return; }
+    $('saveText').innerHTML = `<strong>${esc(rec.label)}</strong>`;
     try {
+      setStatus('Loading the calculator…');
       const engine = await loadEngine();
       setStatus('Calculating stamp costs and carry capacity… this takes a few seconds.');
       await new Promise(r => setTimeout(r, 30));
-      let parsed;
-      try { parsed = JSON.parse(text); } catch (e) { throw new Error('This is not valid JSON. Paste the whole file content, from the first { to the last }.'); }
-      const result = engine.compute(parsed);
-      const stamp = new Date().toLocaleString('de-CH', {dateStyle: 'short', timeStyle: 'short'});
-      result.meta.save = `${label} · imported ${stamp}`;
+      const result = engine.compute(JSON.parse(rec.text));
+      result.meta.save = `${rec.label} · save from ${T.when(rec.lastUpdated)}`;
+      if (seq !== loadSeq) return;
       D = result;
-      try { localStorage.setItem(LS_KEY, JSON.stringify(result)); } catch (e) {}
+      T.cache.set('stamps', rec.id, CACHE_VERSION, result);
       renderAll();
-      setStatus(`Updated from ${label}: ${result.stamps.length} stamps, ${result.meta.chars} characters.`, 'ok');
-      setImportOpen(false);
+      setStatus('');
     } catch (e) {
+      D = null; renderAll();
       setStatus(e.message || String(e), 'err');
-    } finally { busy(false); }
+    }
   }
-  const readFile = (file) => {
-    if (!file) return;
-    const fr = new FileReader();
-    fr.onload = () => importText(String(fr.result), file.name);
-    fr.onerror = () => setStatus('Could not read that file. Try pasting its content instead.', 'err');
-    fr.readAsText(file);
-  };
-  $('fileIn').addEventListener('change', e => { readFile(e.target.files[0]); e.target.value = ''; });
-  const drop = $('drop');
-  ['dragenter','dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
-  ['dragleave','drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
-  drop.addEventListener('drop', e => readFile(e.dataTransfer.files[0]));
-  $('pasteBtn').addEventListener('click', () => importText($('pasteIn').value, 'pasted save'));
-  $('resetBtn').addEventListener('click', () => {
-    D = BUILTIN; try { localStorage.removeItem(LS_KEY); } catch (e) {}
-    renderAll(); setImportOpen(!(D && D.stamps)); setStatus(BUILTIN ? 'Showing the built-in save again.' : 'Imported save cleared.');
-  });
 
   $('planSummary').addEventListener('click', (e) => { const btn = e.target.closest('button[data-k]'); if (btn) { sk = btn.dataset.k; renderPlan(); } });
   ['fReach','fOwned','fExalt'].forEach(id => $(id).addEventListener('change', renderPlan));
@@ -416,8 +368,8 @@
     th.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
   });
 
-  try { const saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); if (saved && saved.stamps && saved.meta) D = saved; } catch (e) {}
-  renderAll();
-  setImportOpen(!(D && D.stamps));
+  try { localStorage.removeItem('stampPlannerImport'); } catch (e) {} // old per-tool import, now on the Account page
+  if (window.IdleonTools) { renderAll(); loadFromAccount(); window.IdleonTools.account.onChange(loadFromAccount); }
+  else { $('acctLink').hidden = true; renderAll(); }
 })();
 </script>
