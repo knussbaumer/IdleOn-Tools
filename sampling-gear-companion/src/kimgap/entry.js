@@ -258,7 +258,20 @@ export const analyzeSave = (raw) => {
     } catch (e) {}
   }
   const trophies = (account?.gallery?.trophiesUsed || []).map((x) => x?.rawName).filter(Boolean);
-  return { trophies, chars, samples, extras, details, bisSave, lastUpdated: save.lastUpdated ?? null };
+  // Gallery and hat rack, for the AFK gains view.
+  let gallery = null;
+  try {
+    const g = account?.gallery || {};
+    gallery = {
+      multi: g.bonusMulti ?? null,
+      podiums: [g.podiumsOwned, g.lv2PodiumsOwned, g.lv3PodiumsOwned, g.lv4PodiumsOwned],
+      trophies: (g.trophiesUsed || []).map((x) => (x?.isEmpty ? { empty: true, level: x.podiumLevel } : { raw: x.rawName, level: x.podiumLevel, multi: x.podiumMultiplier, stats: [x.UQ1txt, x.UQ2txt].filter((s) => s && s !== '0') })),
+      inventory: (g.inventoryTrophies || []).map((x) => ({ raw: x.rawName, stats: [x.UQ1txt, x.UQ2txt].filter((s) => s && s !== '0') })),
+      nametags: (g.nametagsUsed || []).map((x) => ({ raw: x.rawName, level: x.level, multi: x.nametagMultiplier, stats: [x.UQ1txt, x.UQ2txt].filter((s) => s && s !== '0') })),
+      hats: { count: account?.hatRack?.totalHats ?? (account?.hatRack?.hatsUsed || []).length, multi: account?.hatRack?.bonusMulti ?? null },
+    };
+  } catch (e) {}
+  return { gallery, trophies, chars, samples, extras, details, bisSave, lastUpdated: save.lastUpdated ?? null };
 };
 
 export const evaluate = (node) => evaluateBreakdownNode(node);

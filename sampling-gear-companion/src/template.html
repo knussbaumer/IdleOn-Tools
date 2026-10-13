@@ -172,6 +172,8 @@ table.slots td.miss { box-shadow: inset 0 0 0 2px #d14b3b; border-color: #d14b3b
 .supers .st.miss { box-shadow: inset 0 0 0 2px #d14b3b; }
 .supers .st .slot img { width: 36px; height: 36px; object-fit: contain; image-rendering: pixelated; }
 .supers .gt { color: var(--muted); font-weight: 600; padding: 0 2px; }
+.gal .minitable td, .gal .minitable th { white-space: nowrap; }
+.gal .minitable td:first-child { min-width: 210px; }
 img.ic { width: 22px; height: 22px; object-fit: contain; vertical-align: middle; image-rendering: pixelated; margin-right: 6px; }
 img.ic.lg { width: 30px; height: 30px; }
 .src-name img.ic { margin-right: 6px; }
@@ -1106,24 +1108,59 @@ const ICONS = /*__ICONS__*/;
     for (const [p, f] of Object.entries(rows.leafFns || {})) { allMap[p] = f(deltas[p]); fullMap[p] = f(deltasFull[p]); }
     return { base, rows, allGain: evalTree(withLeaves(mine, allMap)) / base, fullGain: evalTree(withLeaves(mine, fullMap)) / base, players };
   };
-  const galleryDetail = (r, char) => {
-    if (r.part !== 'trophies' && r.part !== 'nametags') return '';
-    const myItems = char.afk?.parts?.[r.stat]?.[r.part === 'trophies' ? 'trophyItems' : 'nametagItems'] || [];
-    const key = r.part === 'trophies' ? 'trophies' : 'nametags';
-    const mine = new Set(Object.values(char.afk?.parts || {}).flatMap((pp) => (pp?.[r.part === 'trophies' ? 'trophyItems' : 'nametagItems'] || []).map((x) => x.raw)));
-    const counts = {};
-    Object.values(BENCH.gallery || {}).forEach((g) => (g[key] || []).forEach((x) => { counts[x.raw] = (counts[x.raw] || 0) + 1; }));
-    const total = Object.keys(BENCH.gallery || {}).length;
-    const theirOnly = Object.entries(counts).filter(([raw]) => !mine.has(raw)).sort((a, b) => b[1] - a[1]);
-    const chip = (raw, sub) => `<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 10px 2px 0">${ic(raw, true)}<span class="src-ctx">${esc(sub)}</span></span>`;
-    return `<p class="dnote">Gallery items counted here are the ones placed on podiums (any AFK gains stat, not only this one, is listed for the top accounts).</p>
-      <div><strong>Yours</strong> (${esc(r.stat.replace(/_/g, ' ').replace('%', '').trim())}):<br>${myItems.length ? myItems.map((x) => chip(x.raw, `${pretty(x.name)} +${fmt(x.value)}%${x.podium ? ' · podium ' + x.podium : ''}`)).join('') : '<span class="src-ctx">none</span>'}</div>
-      ${theirOnly.length ? `<div><strong>Placed by top accounts but not by you</strong>:<br>${theirOnly.map(([raw, n]) => chip(raw, `${ICONS['n:' + raw] || raw} · ${n} of ${total} accounts`)).join('')}</div>` : ''}`;
+  // Gallery and hat rack ---------------------------------------------------------
+  const AFK_STAT_NAMES = { '%_AFK_GAINS_MULTI': 'AFK gains multi', '%_ALL_AFK_GAIN': 'All AFK gains', '%_SKILL_AFK_GAIN': 'Skill AFK gains', '%_FISH_AFK_GAIN': 'Fishing AFK gains', '%_CATCH_AFK_GAIN': 'Catching AFK gains' };
+  const isAfkItem = (x) => (x?.stats || []).some((s) => AFK_STAT_NAMES[s]);
+  const PODIUM_MULTI = { 1: 1, 2: 1.5, 3: 2, 4: 2.5 };
+  const NAMETAG_MULTI = [1, 1.6, 2, 2.3, 2.5];
+  const itemName = (raw) => ICONS['n:' + raw] || pretty(raw);
+  const statsOf = (raw) => { const it = (analysis.gallery?.trophies || []).concat(analysis.gallery?.inventory || [], analysis.gallery?.nametags || []).find((x) => x.raw === raw); return it ? it.stats.filter((s) => AFK_STAT_NAMES[s]).map((s) => AFK_STAT_NAMES[s]).join(', ') : ''; };
+  const galleryPanel = (skill) => {
+    const g = analysis.gallery; if (!g) return '<p class="dnote">Import your save again to see the gallery comparison.</p>';
+    const players = BENCH.skills[skill].players.map((p) => ({ name: p.player, g: BENCH.gallery?.[p.player] }));
+    const head = `<tr><th></th><th class="num">You</th>${players.map((p) => `<th class="num">${esc(p.name)}</th>`).join('')}</tr>`;
+    const myPod = { 1: 0, 2: 0, 3: 0, 4: 0 }; (g.trophies || []).forEach((x) => { myPod[x.level || 1] = (myPod[x.level || 1] || 0) + 1; });
+    const cmp = (label, mine, theirs, f = (v) => fmt(v)) => `<tr><td>${label}</td><td class="num">${mine == null ? '–' : f(mine)}</td>${theirs.map((v) => `<td class="num">${v == null ? '–' : f(v)}${typeof v === 'number' && typeof mine === 'number' && v > mine + 1e-9 ? ' <span class="pill gap">+' + fmt(v - mine) + '</span>' : ''}</td>`).join('')}</tr>`;
+    const summary = `<div class="scroll"><table class="minitable"><thead>${head}</thead><tbody>
+      ${cmp(`${ic('GalleryPodiumA3')}Gallery bonus multi`, g.multi, players.map((p) => p.g?.multi ?? null), (v) => v.toFixed(3) + '×')}
+      ${[4, 3, 2, 1].map((lv) => cmp(`<span class="src-ctx">Level ${lv} podiums (×${PODIUM_MULTI[lv]})</span>`, myPod[lv] || 0, players.map((p) => p.g?.podiums?.[lv] ?? null))).join('')}
+      ${cmp(`${ic('HatHelpA')}Hats in the hat rack`, g.hats?.count ?? null, players.map((p) => p.g?.hats?.count ?? null))}
+      ${cmp('<span class="src-ctx">Hat rack bonus multi</span>', g.hats?.multi ?? null, players.map((p) => p.g?.hats?.multi ?? null), (v) => v.toFixed(2) + '×')}
+      </tbody></table></div>`;
+    // Trophies with an AFK stat: where each account has them.
+    const where = (gg, raw) => { const t = (gg.trophies || []).find((x) => x.raw === raw); if (t) return { lv: t.level, txt: `podium ${t.level} (×${PODIUM_MULTI[t.level]})` }; if ((gg.inventory || []).some((x) => (x.raw || x) === raw)) return { lv: 0.3, txt: 'inventory (×0.3)' }; return null; };
+    const trophyRaws = [];
+    (g.trophies || []).concat(g.inventory || []).filter(isAfkItem).forEach((x) => trophyRaws.includes(x.raw) || trophyRaws.push(x.raw));
+    players.forEach((p) => (p.g?.trophies || []).forEach((x) => trophyRaws.includes(x.raw) || trophyRaws.push(x.raw)));
+    players.forEach((p) => (p.g?.inventory || []).forEach((x) => trophyRaws.includes(x) || trophyRaws.push(x)));
+    const trophyRows = trophyRaws.map((raw) => {
+      const m = where(g, raw);
+      return `<tr><td>${ic(raw)}${esc(itemName(raw))}<div class="src-ctx">${esc(statsOf(raw))}</div></td><td class="num">${m ? m.txt : '<span class="pill gap">not placed</span>'}</td>${players.map((p) => { const w = p.g ? where(p.g, raw) : null; return `<td class="num">${w ? w.txt : '–'}${w && (!m || w.lv > m.lv) ? ' <span class="pill gap">higher</span>' : ''}</td>`; }).join('')}</tr>`;
+    }).join('');
+    const myPodiums = [4, 3, 2, 1].map((lv) => { const list = (g.trophies || []).filter((x) => !x.empty && (x.level || 1) === lv); return list.length ? `<div style="margin:2px 0"><span class="src-ctx">Level ${lv}:</span> ${list.map((x) => `<span title="${esc(itemName(x.raw) + (isAfkItem(x) ? ' (AFK)' : ''))}" style="display:inline-block;${isAfkItem(x) ? 'box-shadow:inset 0 0 0 2px #2f9e5a;border-radius:5px;' : ''}">${ic(x.raw, true)}</span>`).join('')}</div>` : ''; }).join('');
+    // Nametags with an AFK stat: deposits (1 to 5 raise the bonus).
+    const ntRaws = [];
+    (g.nametags || []).filter(isAfkItem).forEach((x) => ntRaws.includes(x.raw) || ntRaws.push(x.raw));
+    players.forEach((p) => Object.keys(p.g?.nametags || {}).forEach((r) => ntRaws.includes(r) || ntRaws.push(r)));
+    const lvCell = (n) => (n == null ? '–' : `${Math.min(n, 5)}/5${n > 5 ? ` <span class="src-ctx">(${n})</span>` : ''}`);
+    const ntRows = ntRaws.map((raw) => {
+      const mine = (g.nametags || []).find((x) => x.raw === raw)?.level ?? null;
+      return `<tr${mine == null || mine < 5 ? ' class="hl"' : ''}><td>${ic(raw)}${esc(itemName(raw))}<div class="src-ctx">${esc(statsOf(raw))}</div></td><td class="num">${mine == null ? '<span class="pill gap">missing</span>' : lvCell(mine) + (mine < 5 ? ` <span class="pill gap">×${NAMETAG_MULTI[Math.min(mine, 5) - 1]}</span>` : '')}</td>${players.map((p) => { const n = p.g?.nametags?.[raw]; return `<td class="num">${lvCell(n ?? null)}</td>`; }).join('')}</tr>`;
+    }).join('');
+    return `<article class="setup gal"><h3>${ic('GalleryPodiumA3', true)}Gallery and hat rack</h3>
+      <p class="dnote">Gallery bonuses are account-wide. A trophy's bonus depends on the podium level it sits on (level 4 gives ×2.5, inventory only ×0.3), a nametag's on how many copies are deposited (1 to 5 copies: ×1, ×1.6, ×2, ×2.3, ×2.5; more than 5 adds nothing). Everything is then multiplied by the gallery bonus multi.</p>
+      ${summary}
+      <h3>Trophies with AFK gains</h3>${trophyRows ? `<div class="scroll"><table class="minitable"><thead><tr><th>Trophy</th><th class="num">You</th>${players.map((p) => `<th class="num">${esc(p.name)}</th>`).join('')}</tr></thead><tbody>${trophyRows}</tbody></table></div>` : ''}
+      <div><span class="dnote">Your podiums (AFK trophies framed green):</span>${myPodiums}</div>
+      <h3>Nametags with AFK gains</h3>${ntRows ? `<div class="scroll"><table class="minitable"><thead><tr><th>Nametag (copies deposited)</th><th class="num">You</th>${players.map((p) => `<th class="num">${esc(p.name)}</th>`).join('')}</tr></thead><tbody>${ntRows}</tbody></table></div>` : ''}
+    </article>`;
   };
+  const galleryDetail = (r) => (r.part === 'trophies' || r.part === 'nametags' || r.part === 'hatRack' ? '<p class="dnote">See the Gallery and hat rack panel above the table for every trophy, nametag and the hat count.</p>' : '');
   const afkSection = (skill, char) => {
     const a = compareAfk(skill, char);
     if (!a) return '<section class="afk"><h2>AFK gains</h2><p class="lede">Import your save again to see the AFK gains comparison.</p></section>';
     const bestTop = a.players.reduce((x, p) => (p.afk > (x?.afk || 0) ? p : x), null);
+    const isMultiRow = (r) => r.stat === '%_AFK_GAINS_MULTI' || (!r.part && (r.unit === 'multiplier' || /multi|Tesseract/i.test(r.name)));
     const unitOf = (r) => (r.part ? '%' : r.unit === 'multiplier' || /multi|Tesseract/i.test(r.name) ? '×' : '%');
     const rowsSorted = a.rows.filter((r) => showIgnored || !r.ignored).filter((r) => showAhead || r.ignored || (r.best && r.best.gain > 1.0005)).sort((x, y) => (y.best?.gain || 0) - (x.best?.gain || 0));
     const maxLog = Math.max(...a.rows.filter((r) => !r.ignored && r.best).map((r) => Math.log(r.best.gain)), 0.01);
@@ -1136,7 +1173,7 @@ const ICONS = /*__ICONS__*/;
       let out = `<tr class="${r.ignored ? 'row-ign' : g > 1.005 ? '' : 'row-ahead'}"><td><button type="button" class="link" data-row="${esc(key)}" data-afk="1" aria-expanded="${isOpen}"><span class="chev" aria-hidden="true">${isOpen ? '▾' : '▸'}</span><span class="src-name">${afkIcons(r, skill).map((x) => ic(x)).join('')}${esc(r.name)}</span></button><div class="src-ctx">${esc((r.ctx || []).join(' › ') || (r.part ? (r.stat === '%_AFK_GAINS_MULTI' ? 'AFK gains multiplier' : 'AFK gains') : u === '×' ? 'AFK gains multiplier' : 'AFK gains'))}${r.part && r.part !== 'equipment' ? ' · account-wide' : ''}</div></td>
         <td class="num">${fmt(r.value)}${u}</td><td class="num">${fmt(r.med)}${u}</td><td class="num">${r.best ? fmt(r.best.value) + u + `<div class="who">${esc(r.best.player)}</div>` : '–'}</td>
         <td class="num"><div class="gain"><div class="bar" aria-hidden="true"><i style="width:${width}%"></i></div><span>${r.best ? fmtX(g) : '–'}</span></div></td><td>${st}</td></tr>`;
-      if (isOpen) out += `<tr class="detail"><td colspan="6"><div class="dwrap"><div class="dsec"><h3>${afkIcons(r, skill).map((x) => ic(x, true)).join('')}${esc(r.name)}</h3>${desc(r) ? `<p class="dnote">${esc(desc(r))}</p>` : ''}${galleryDetail(r, char)}</div><div class="dsec"><div class="scroll"><table class="minitable"><thead><tr><th>Player</th><th>Character</th><th class="num">Value</th><th class="num">Your AFK gains if matched</th></tr></thead><tbody>
+      if (isOpen) out += `<tr class="detail"><td colspan="6"><div class="dwrap"><div class="dsec"><h3>${afkIcons(r, skill).map((x) => ic(x, true)).join('')}${esc(r.name)}</h3>${desc(r) ? `<p class="dnote">${esc(desc(r))}</p>` : ''}${galleryDetail(r)}</div><div class="dsec"><div class="scroll"><table class="minitable"><thead><tr><th>Player</th><th>Character</th><th class="num">Value</th><th class="num">Your AFK gains if matched</th></tr></thead><tbody>
         <tr class="you"><td>You</td><td>${esc(char.name)}</td><td class="num">${fmt(r.value)}${u}</td><td class="num">1×</td></tr>
         ${r.theirs.map((t) => `<tr><td>${esc(t.player)}</td><td>${esc(t.char)}</td><td class="num">${fmt(t.value)}${u}</td><td class="num">${typeof t.gain === 'number' ? fmtX(t.gain) : '–'}</td></tr>`).join('')}</tbody></table></div></div></div></td></tr>`;
       return out;
@@ -1149,8 +1186,9 @@ const ICONS = /*__ICONS__*/;
         <div class="stat warn"><span class="eyebrow">Close every AFK gap</span><span class="v">${fmtX(a.allGain)}</span><span class="s">AFK gains, and the same factor on the sample</span></div>
         <div class="stat"><span class="eyebrow">Including worn gear and obols</span><span class="v">${fmtX(a.fullGain)}</span><span class="s">if the loadout rows (gear, obols, cards, chips) matched too; tick "Show ignored sources" to see them</span></div>
       </div>
+      ${galleryPanel(skill)}
       <div class="sources"><div class="scroll"><table><thead><tr><th>AFK gains source</th><th class="num">You</th><th class="num">Top-5 median</th><th class="num">Best</th><th class="num">Gain if matched</th><th>Status</th></tr></thead>
-      <tbody>${rowsSorted.map(row).join('')}</tbody></table></div></div></section>`;
+      <tbody>${[['multi', 'Multipliers (×)', 'each one multiplies your whole AFK gains'], ['pct', 'AFK gains (%)', 'these add up, then the total is multiplied by the multipliers']].map(([id, title, note]) => { const body = rowsSorted.filter((r) => (isMultiRow(r) ? 'multi' : 'pct') === id).map(row).join(''); return body ? `<tr class="section"><td colspan="6">${esc(title)} <span class="src-ctx">${esc(note)}</span></td></tr>` + body : ''; }).join('')}</tbody></table></div></div></section>`;
   };
 
   // Render ------------------------------------------------------------------
