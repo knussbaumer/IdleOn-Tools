@@ -162,6 +162,16 @@ tr.hl td { font-weight: 600; }
 .card .scroll { overflow-x: auto; }
 .card p { color: var(--muted); font-size: 0.88rem; }
 
+table.slots td.have { box-shadow: inset 0 0 0 2px #2f9e5a; border-color: #2f9e5a; }
+table.slots td.miss { box-shadow: inset 0 0 0 2px #d14b3b; border-color: #d14b3b; }
+.checks-key { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.82rem; color: var(--muted); align-items: center; }
+.checks-key i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: -2px; margin-right: 5px; }
+.supers { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 4px; }
+.supers .st { width: 48px; height: 48px; border-radius: 8px; background: var(--surface); display: inline-flex; }
+.supers .st.have { box-shadow: inset 0 0 0 2px #2f9e5a; }
+.supers .st.miss { box-shadow: inset 0 0 0 2px #d14b3b; }
+.supers .st .slot img { width: 36px; height: 36px; object-fit: contain; image-rendering: pixelated; }
+.supers .gt { color: var(--muted); font-weight: 600; padding: 0 2px; }
 img.ic { width: 22px; height: 22px; object-fit: contain; vertical-align: middle; image-rendering: pixelated; margin-right: 6px; }
 img.ic.lg { width: 30px; height: 30px; }
 .src-name img.ic { margin-right: 6px; }
@@ -852,22 +862,62 @@ const ICONS = /*__ICONS__*/;
     'Fishing': 'Fishing sampler setup. Pick bait, line and ring per fishing spot from the table below.',
   };
   let TIPS = [];
-  const slotBtn = (s, cat) => { if (!s) return ''; const id = TIPS.push({ ...s, cat }) - 1; return `<button type="button" class="slot" data-tip="${id}" aria-label="${esc(s.tip.title)}"><img src="${BIS.imgs[s.raw]}" alt=""></button>`; };
-  const td = (s, cat, cls = '') => `<td class="${(s ? '' : 'empty ') + cls}">${slotBtn(s, cat)}</td>`;
+  let CHECK_NAME_FOR_TIP = '';
+  const slotBtn = (s, cat, extra = {}) => { if (!s) return ''; const id = TIPS.push({ ...s, cat, ...extra }) - 1; return `<button type="button" class="slot" data-tip="${id}" aria-label="${esc(s.tip.title)}"><img src="${s.src || BIS.imgs[s.raw]}" alt=""></button>`; };
+  // Equipped checks: for the selected character, is each best-in-slot item on it right now?
+  // Counts handle doubles (two rings, two keychains): each copy needs its own equipped copy.
+  const makeChecker = (char) => {
+    const lo = char?.loadout; if (!lo) return null;
+    const pool = {};
+    const fill = (key, list) => { pool[key] = {}; (list || []).forEach((x) => { pool[key][x] = (pool[key][x] || 0) + 1; }); };
+    fill('equip', lo.equip); fill('tools', lo.tools); fill('food', lo.food); fill('chips', lo.chips); fill('cards', lo.cards); fill('prayers', lo.prayers); fill('obols', lo.obols);
+    fill('trophy', analysis?.trophies || []);
+    const POOL = { Equipment: 'equip', Specials: 'equip', Tools: 'tools', Food: 'food', Chips: 'chips', Cards: 'cards', Prayers: 'prayers', Obols: 'obols', Trophy: 'trophy' };
+    return (cat, s) => {
+      if (!s) return null;
+      if (cat === 'Card set') return lo.cardSet === s.raw;
+      const key = POOL[cat]; if (!key) return null;
+      const id = cat === 'Cards' ? s.cardIndex : s.raw;
+      if (pool[key][id] > 0) { pool[key][id] -= 1; return true; }
+      return false;
+    };
+  };
+  let CHECK = null, CHECK_NAME = '';
+  const mark = (cat, s) => { const v = CHECK ? CHECK(cat, s) : null; return v === null ? { cls: '', extra: {} } : { cls: v ? ' have' : ' miss', extra: { equipped: v } }; };
+  const td = (s, cat, cls = '') => { const m = mark(cat, s); return `<td class="${(s ? '' : 'empty ') + cls + m.cls}">${slotBtn(s, cat, m.extra)}</td>`; };
   const groupHtml = (g) => {
     if (g.cat === 'Cards') {
       const row = (a) => a.map((c) => td(c, 'Cards', 'cd')).join('');
-      return `<div class="sg"><span class="cap">Cards</span><table class="slots"><tbody><tr><td class="set" rowspan="2">${slotBtn(g.set, 'Card set')}</td>${row(g.cards.slice(0, 4))}</tr><tr>${row(g.cards.slice(4, 8))}</tr></tbody></table></div>`;
+      const ms = mark('Card set', g.set);
+      return `<div class="sg"><span class="cap">Cards</span><table class="slots"><tbody><tr><td class="set${ms.cls}" rowspan="2">${slotBtn(g.set, 'Card set', ms.extra)}</td>${row(g.cards.slice(0, 4))}</tr><tr>${row(g.cards.slice(4, 8))}</tr></tbody></table></div>`;
     }
     let rows = '';
     const cells = g.cells.slice();
-    if (g.span0) { rows += `<tr><td colspan="2" class="${cells[0] ? '' : 'empty'}">${slotBtn(cells[0], g.cat)}</td></tr>`; cells.splice(0, 2); }
+    if (g.span0) { const m = mark(g.cat, cells[0]); rows += `<tr><td colspan="2" class="${(cells[0] ? '' : 'empty') + m.cls}">${slotBtn(cells[0], g.cat, m.extra)}</td></tr>`; cells.splice(0, 2); }
     for (let i = 0; i < cells.length; i += g.cols) rows += `<tr>${cells.slice(i, i + g.cols).map((c) => td(c, g.cat)).join('')}</tr>`;
     return `<div class="sg"><span class="cap">${esc(g.cat)}</span><table class="slots"><tbody>${rows}</tbody></table></div>`;
   };
-  const bisBoard = (name) => {
+  const SNAPSHOTS = ['HP Snapshot', 'Mana Snapshot'];
+  const bisBoard = (name, char) => {
     const b = BIS.boards.find((x) => x.name === name); if (!b) return '';
-    return `<article class="setup"><h3>${esc(name)}</h3><div class="setup-groups">${b.groups.map(groupHtml).join('')}</div><p class="dnote">${esc(BIS_NOTES[name] || '')}</p></article>`;
+    CHECK = SNAPSHOTS.includes(name) ? null : makeChecker(char); CHECK_NAME = char?.name || '';
+    const html = `<article class="setup"><h3>${esc(name)}</h3><div class="setup-groups">${b.groups.map(groupHtml).join('')}</div><p class="dnote">${esc(BIS_NOTES[name] || '')}</p></article>`;
+    CHECK = null;
+    return html;
+  };
+  const superHtml = (skill, char) => {
+    const sp = char?.supers?.[skill];
+    if (!sp) return `<article class="setup"><h3>Super talent priority</h3><p class="dnote">${char?.loadout ? 'Worked out for characters of this skill\'s class family and your best sampler. Pick one of those above.' : 'Import your save again to see this.'}</p></article>`;
+    const fmtLv = (v) => (typeof v === 'number' ? Math.round(v).toLocaleString('en-US') : '–');
+    const items = sp.list.map((t) => {
+      const val = typeof t.value === 'number' ? fmt(t.value) : '#';
+      const tip = { title: pretty(t.name).toLowerCase().replace(/(^|\s)\S/g, (m) => m.toUpperCase()), type: t.supered ? 'Supered talent' : 'Not supered',
+        lines: [`Level ${fmtLv(t.level)} (base ${fmtLv(t.baseLevel)})`, t.supered ? `Its +${sp.bonus} super levels are worth ${fmtX(t.gain)} ${SK_ICON[skill].label.toLowerCase()} efficiency` : `Supering it (+${sp.bonus} levels): ${fmtX(t.gain)} ${SK_ICON[skill].label.toLowerCase()} efficiency`, pretty(t.description || '').replace(/[{}]/g, val)] };
+      return `<span class="st ${t.supered ? 'have' : 'miss'}">${slotBtn({ raw: 'UISkillIcon' + t.skillIndex, src: ICONS['UISkillIcon' + t.skillIndex], tip }, 'Talent')}</span>`;
+    });
+    return `<article class="setup"><h3>Super talent priority</h3>
+      ${items.length ? `<div class="supers">${items.join('<span class="gt" aria-hidden="true">&gt;</span>')}</div>` : '<p class="dnote">None of this character\'s talents change this skill\'s efficiency.</p>'}
+      <p class="dnote">Every talent of ${esc(char.name)} that changes ${esc(SK_ICON[skill].label.toLowerCase())} efficiency, best first, ranked by what +${sp.bonus} super talent levels do for it. ${sp.slotsUsed} talents are supered on this character in total, including ones that do nothing for this skill.</p></article>`;
   };
   const spotsHtml = () => {
     if (!BIS.spots) return '';
@@ -877,12 +927,13 @@ const ICONS = /*__ICONS__*/;
       <div class="scroll"><table class="minitable"><thead><tr><th colspan="2">Fish</th><th>Bait</th><th>Line</th><th>Ring</th><th>Where</th></tr></thead><tbody>${body}</tbody></table></div>
       <p class="dnote">${slotBtn(BIS.zeus, 'Line')} For Bloach, Kraken and Caulifish, Zeus Gon Fishin was better than Platinum Twine depending on whether you were at an efficiency break point. Try it out yourself, or just use Platinum Twine. The difference is 1 to 2% at best.</p></article>`;
   };
-  const bisSection = (skill) => {
+  const bisSection = (skill, char) => {
     TIPS = [];
     const boards = BIS_BOARDS[skill] || [];
     return `<section class="bis-wrap" aria-label="Best in slot">
       <div class="bis-head"><h2>Best in slot</h2><span class="dnote">Hover or tap an item for its description and stats.</span></div>
-      <div class="bis-boards">${boards.map(bisBoard).join('')}${skill === 'fishing' ? spotsHtml() : ''}</div>
+      <div class="checks-key"><span><i style="box-shadow:inset 0 0 0 2px #2f9e5a"></i>supered / equipped on ${esc(char?.name || 'this character')}</span><span><i style="box-shadow:inset 0 0 0 2px #d14b3b"></i>not supered / not equipped</span><span>Trophies are checked against your gallery. The snapshot setups are not checked.</span></div>
+      <div class="bis-boards">${superHtml(skill, char)}${boards.map((b) => bisBoard(b, char)).join('')}${skill === 'fishing' ? spotsHtml() : ''}</div>
       <p class="credit">Taken and updated from AlmostPsycho's Sampling Sheet, Thank you.</p>
     </section>`;
   };
@@ -914,6 +965,7 @@ const ICONS = /*__ICONS__*/;
         saveLines.push(p.curse ? `Curse: ${s.tip.curse.replace('{', fmtB(p.curse))}` : 'Curse: none on your save');
       }
     }
+    if (s.equipped !== undefined) saveLines.unshift(s.equipped ? (s.cat === 'Trophy' ? 'Placed in your gallery' : `Equipped on ${CHECK_NAME_FOR_TIP}`) : (s.cat === 'Trophy' ? 'Not placed in your gallery' : `Not equipped on ${CHECK_NAME_FOR_TIP}`));
     tipEl.innerHTML = `<span class="ty">${esc(s.cat)} · ${esc(s.tip.type)}</span><span class="t">${esc(s.tip.title)}</span>${saveLines.length ? `<span class="sv">${saveLines.map(esc).join('<br>')}</span>` : ''}${lines.length ? `<ul>${lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}`;
     tipEl.hidden = false;
     const r = btn.getBoundingClientRect(); const tw = tipEl.offsetWidth, th = tipEl.offsetHeight;
@@ -985,10 +1037,12 @@ const ICONS = /*__ICONS__*/;
     };
 
     panel.innerHTML = `
-      ${bisSection(skill)}
       <div class="controls">
         <div class="field"><label for="charSel">Your ${esc(meta.tab.toLowerCase())} character</label>
           <select id="charSel">${sortedChars.map((c) => `<option value="${esc(c.name)}" ${c.name === char.name ? 'selected' : ''}>${esc(c.name)} · ${esc(pretty(c.cls))} · lv ${c.skillLv[skill]}${mySample?.char === c.name ? ' · best sample' : ''}</option>`).join('')}</select></div>
+      </div>
+      ${(CHECK_NAME_FOR_TIP = char.name, bisSection(skill, char))}
+      <div class="controls">
         <label class="check" for="showAhead"><input type="checkbox" id="showAhead" ${showAhead ? 'checked' : ''}> Show sources where you are level or ahead</label>
         <label class="check" for="showIgn"><input type="checkbox" id="showIgn" ${showIgnored ? 'checked' : ''}> Show ignored sources</label>
         <div class="btnrow"><button type="button" id="expandAll">Expand all</button><button type="button" id="collapseAll">Collapse all</button></div>

@@ -17,6 +17,7 @@ import { getCardSets } from '@parsers/cards';
 import { calcCardBonus } from '@parsers/cardMath';
 import { getItemCapacity, getGoldenFoodMulti, getGoldenFoodBonus } from '@parsers/misc';
 import { lavaLog } from '@utility/helpers';
+import { getSuperTalentAddedLevels } from '@parsers/talents';
 import { items as ITEMS } from '@website-data';
 
 // Golden food: what this character's bonus would be with a full food-slot stack (carry cap, or what storage holds).
@@ -49,6 +50,9 @@ const DETAILS = makeDetails({ evaluateBreakdownNode, growth, getMonumentBonus, g
 export const SKILLS = ['mining', 'chopping', 'catching', 'fishing'];
 export const STATUE_IDX = { mining: 2, chopping: 6, catching: 9, fishing: 8 };
 export const MONUMENT_T = { mining: 0, chopping: 2, catching: 1 };
+// Classes that sample each item; the super talent plan is worked out for these (and the best sampler).
+const WARRIORS = ['Warrior', 'Barbarian', 'Squire', 'Blood_Berserker', 'Death_Bringer', 'Divine_Knight', 'Royal_Guardian'];
+const FAMILY = { mining: WARRIORS, chopping: ['Mage', 'Wizard', 'Shaman', 'Elemental_Sorcerer', 'Bubonic_Conjuror', 'Arcane_Cultist'], catching: ['Archer', 'Bowman', 'Hunter', 'Siege_Breaker', 'Beast_Master', 'Wind_Walker'], fishing: WARRIORS };
 export const SAMPLE_ITEMS = { mining: 'Copper', chopping: 'OakTree', catching: 'Bug1', fishing: 'Fish1' };
 
 // Plain JSON copy of a breakdown tree that evaluateBreakdownNode can re-evaluate.
@@ -61,6 +65,34 @@ export const cleanNode = (n) => {
   return out;
 };
 export const cleanBreakdown = (b) => b && ({ statName: b.statName, combine: b.combine, min: b.min, max: b.max, round: b.round, step: b.step, tree: (b.tree || []).map(cleanNode) });
+
+// Super talents: for every talent of this character, how much this skill's efficiency changes with the
+// super talent levels on it (added if it is not supered yet, removed to measure it if it is).
+const withTalentLevels = (c, skillIndex, delta) => {
+  const bump = (t) => (t?.skillIndex === skillIndex ? { ...t, level: (t.level || 0) + delta } : t);
+  const talents = c.talents ? Object.fromEntries(Object.entries(c.talents).map(([k, v]) => [k, v?.orderedTalents ? { ...v, orderedTalents: v.orderedTalents.map(bump) } : v])) : c.talents;
+  return { ...c, flatTalents: (c.flatTalents || []).map(bump), talents };
+};
+export const superTalentPlan = (c, characters, account, skill, pi) => {
+  const eff = (ch, chars) => { try { return getSkillEfficiency(skill, ch, chars, account, pi)?.value; } catch (e) { return null; } };
+  const base = eff(c, characters); if (!base) return null;
+  const bonus = c?.superTalentsInfo?.bonus || getSuperTalentAddedLevels(account) || 0;
+  const supered = new Set((c?.superTalentsInfo?.talents || []).map((x) => x.talentIndex));
+  const out = [];
+  const seen = new Set();
+  for (const t of c.flatTalents || []) {
+    if (!t || seen.has(t.skillIndex) || !(t.level >= 1) || !t.name || /^_|FILLER/.test(t.name)) continue;
+    seen.add(t.skillIndex);
+    const isSuper = supered.has(t.skillIndex);
+    const c2 = withTalentLevels(c, t.skillIndex, isSuper ? -bonus : bonus);
+    const v = eff(c2, characters.map((x) => (x === c ? c2 : x)));
+    if (!v) continue;
+    const gain = isSuper ? base / v : v / base;
+    if (gain > 1.0005) out.push({ skillIndex: t.skillIndex, name: t.name, level: t.level, baseLevel: t.baseLevel, maxLevel: t.maxLevel, supered: isSuper, gain, description: t.description, value: (() => { try { return growth(t.funcX, t.level, t.x1, t.x2, false); } catch (e) { return null; } })() });
+  }
+  out.sort((a, b) => b.gain - a.gain);
+  return { bonus, slotsUsed: supered.size, list: out };
+};
 
 export const characterTrees = (c, characters, account) => {
   let pi; try { pi = getMaxDamage(c, characters, account); } catch (e) { pi = undefined; }
@@ -94,7 +126,18 @@ export const analyzeSave = (raw) => {
     const inputs = Object.fromEntries(SKILLS.map((s) => { try { return [s, INPUTS.forSkill(account, characters, c, s, piForInputs)]; } catch (e) { return [s, { __error: [{ label: String(e && e.stack || e).slice(0, 300), value: null }] }]; } }));
     const statueVal = Object.fromEntries(SKILLS.map((s) => [s, DETAILS.forSkill(account, characters, c, s)?.statue?.statue?.value ?? null]));
     const golden = Object.fromEntries(SKILLS.map((s) => { try { return [s, goldenWhatIf(c, characters, account, s)]; } catch (e) { return [s, null]; } }));
-    return { golden, name: c.name, cls: c.class, level: c.level, skillLv: Object.fromEntries(SKILLS.map((s) => [s, c.skillsInfo?.[s]?.level ?? 0])), trees, values, statueVal, inputs };
+    const supers = Object.fromEntries(SKILLS.filter((s) => FAMILY[s].includes(c.class) || samples[s]?.char === c.name).map((s) => { try { return [s, superTalentPlan(c, characters, account, s, piForInputs)]; } catch (e) { return [s, null]; } }));
+    const loadout = {
+      equip: (c.equipment || []).map((x) => x?.rawName).filter((x) => x && x !== 'Blank'),
+      tools: (c.tools || []).map((x) => x?.rawName).filter((x) => x && x !== 'Blank'),
+      food: (c.food || []).map((x) => x?.rawName).filter((x) => x && x !== 'Blank'),
+      chips: (account?.lab?.playersChips?.[c.playerId] || []).map((x) => x?.rawName || ('ConsoleChip' + x?.index)).filter(Boolean),
+      cards: (c.cards?.equippedCards || []).map((x) => x?.cardIndex).filter(Boolean),
+      cardSet: c.cards?.cardSet?.rawName || null,
+      prayers: (c.activePrayers || []).map((x) => 'Prayer' + x?.prayerIndex),
+      obols: (c.obols?.list || []).map((x) => x?.rawName).filter((x) => x && !/Locked|Blank/.test(x)),
+    };
+    return { loadout, supers, golden, name: c.name, cls: c.class, level: c.level, skillLv: Object.fromEntries(SKILLS.map((s) => [s, c.skillsInfo?.[s]?.level ?? 0])), trees, values, statueVal, inputs };
   });
   const h = account?.hole?.holesObject || {};
   const extras = {};
@@ -120,7 +163,8 @@ export const analyzeSave = (raw) => {
       bisSave.prayers[name] = { level: pr?.level ?? 0, maxLevel: pr?.maxLevel ?? null, bonus: r?.bonus ?? 0, curse: r?.curse ?? 0 };
     } catch (e) {}
   }
-  return { chars, samples, extras, details, bisSave, lastUpdated: save.lastUpdated ?? null };
+  const trophies = (account?.gallery?.trophiesUsed || []).map((x) => x?.rawName).filter(Boolean);
+  return { trophies, chars, samples, extras, details, bisSave, lastUpdated: save.lastUpdated ?? null };
 };
 
 export const evaluate = (node) => evaluateBreakdownNode(node);
