@@ -154,6 +154,13 @@ tr.group td{font-family:var(--f-display);font-size:12px;text-transform:uppercase
 .well img{width:22px;height:22px;object-fit:contain;image-rendering:auto}
 .fci img.gs{width:24px;height:24px;object-fit:contain;image-rendering:auto}
 .lbl-st{margin-left:-4px}
+.fc.custom{border-style:dashed}
+.fc.custom[aria-pressed="true"]{border-style:solid}
+.fc .ctag{font-family:var(--f-display);font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:12px}
+.customctl{flex-basis:100%;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;background:var(--accent-soft);border:1px solid var(--accent);border-radius:6px;padding:8px 12px;font-size:13px}
+.customctl .lbl{font-family:var(--f-display);font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:600}
+.customctl img{width:22px;height:22px;object-fit:contain}
+.customctl input[type=number]{font:inherit;font-family:var(--f-mono);width:5.5em;padding:4px 6px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--ink);text-align:right}
 .fci img.atom{width:22px;height:22px;object-fit:contain;image-rendering:auto}
 .fc[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600}
 input.rate{display:block;margin:0 0 6px auto;text-align:right;width:7.5em;font:inherit;font-family:var(--f-mono);font-size:12px;padding:3px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink)}
@@ -226,6 +233,12 @@ td.farm .sub{margin-top:4px}
   </div>
   <div class="controls">
     <div class="fitcounts" id="planSummary" role="group" aria-label="Reduction: number of stamps whose next tier fits in a character's inventory"></div>
+    <div class="customctl" id="customCtl" hidden>
+      <span class="lbl">Custom reduction</span>
+      <label class="chk"><input type="checkbox" id="cGilded"> <img class="gs" id="cGsImg" alt=""> Gilded Stamp</label>
+      <label class="chk"><img class="atom" id="cAtomImg" alt=""> Hydrogen <input type="number" id="cHydro" min="0" max="90" step="1" inputmode="numeric" aria-label="Hydrogen percent"> %</label>
+      <span class="muted" id="cHint"></span>
+    </div>
     <label class="chk"><input type="checkbox" id="fReach" checked> Hide out of reach</label>
     <label class="chk"><input type="checkbox" id="fOwned"> Only if enough in storage</label>
     <label class="chk"><input type="checkbox" id="fExalt"> Only exalted</label>
@@ -432,14 +445,48 @@ td.farm .sub{margin-top:4px}
       <td class="num">${r.rt}</td>${coinCells(r.gn, r.nt, r.gx, r.rl)}<td>${pill}</td></tr>`;
   };
 
-  // Hydrogen reduction always comes with a Gilded Stamp, so only these four cases exist.
-  const SCEN_KEYS = ['now', 'g', 'g70', 'g90'];
+  // Four fixed cases plus "custom": any Hydrogen % with or without a Gilded Stamp.
+  const SCEN_KEYS = ['now', 'g', 'g70', 'g90', 'custom'];
   let sk = 'g70', sortK = 'fill', sortDir = 1;
-  try { const st = JSON.parse(localStorage.getItem('stampPlanner') || '{}'); if (SCEN_KEYS.includes(st.sk)) sk = st.sk; } catch (e) {}
-  const scenKey = () => sk;
+  let cg = null, ch = null; // custom Gilded / Hydrogen; null = take them from the save
+  try {
+    const st = JSON.parse(localStorage.getItem('stampPlanner') || '{}');
+    if (SCEN_KEYS.includes(st.sk)) sk = st.sk;
+    if (typeof st.cg === 'boolean') cg = st.cg;
+    if (typeof st.ch === 'number') ch = st.ch;
+  } catch (e) {}
+  const hasCustom = () => !!(D && D.meta && D.meta.vr != null && D.stamps.every(s => s.pt));
+  const scenKey = () => (sk === 'custom' && !hasCustom() ? 'g70' : sk);
+  // Same formula as IdleonToolbox getMaterialCost, applied to the engine's pre-reduction cost.
+  const matCost = (pre, g, h) => {
+    const c = pre * (g ? 0.05 : 1) * Math.max(0.1, 1 - h / 100);
+    return Math.floor(Math.max(1, c > 2e9 ? c * D.meta.vr : Math.floor(Math.floor(c) * D.meta.vr)));
+  };
+  const customVals = () => ({
+    g: cg ?? (D.meta.gilded > 0),
+    h: Math.min(90, Math.max(0, ch ?? Math.min(90, D.meta.h.value || 0))),
+  });
+  const applyCustom = () => {
+    if (!hasCustom()) return;
+    const { g, h } = customVals();
+    D.stamps.forEach(s => {
+      let n = 0, mats = 0;
+      for (const p of s.pt) { const c = matCost(p, g, h); if (!(c <= s.cap)) break; n++; mats += c; }
+      s.cs.custom = matCost(s.p0, g, h);
+      s.rr.custom = n; s.mr.custom = mats; s.gr.custom = s.gt[Math.min(n, s.gt.length - 1)];
+    });
+  };
   function renderPlan(){
-    try { localStorage.setItem('stampPlanner', JSON.stringify({sk})); } catch (e) {}
+    try { localStorage.setItem('stampPlanner', JSON.stringify({sk, cg, ch})); } catch (e) {}
+    applyCustom();
     const k = scenKey();
+    const cv = hasCustom() ? customVals() : null;
+    $('customCtl').hidden = k !== 'custom';
+    if (k === 'custom') {
+      $('cGilded').checked = cv.g;
+      if (document.activeElement !== $('cHydro')) $('cHydro').value = cv.h;
+      $('cHint').textContent = cv.g && D.meta.gilded <= 0 ? 'You have no Gilded Stamp right now.' : (ch == null ? 'Starts at your current Hydrogen.' : '');
+    }
     const q = $('fText').value.trim().toLowerCase();
     let rows = D.stamps.map(s => prepRow(s, k));
     const total = rows.length;
@@ -458,7 +505,8 @@ td.farm .sub{margin-top:4px}
     const fitCount = (key) => D.stamps.filter(s => s.cs[key] <= s.cap).length;
     const scen = [['now', '0%', false], ['g', '0%', true], ['g70', '70%', true], ['g90', '90%', true]];
     $('planSummary').innerHTML = scen.map(([key, h, g]) =>
-      `<button type="button" class="fc${g ? ' gold' : ''}" data-k="${key}" aria-pressed="${key === k}" aria-label="${fitCount(key)} with Hydrogen ${h}${g ? ' and a Gilded Stamp' : ', no Gilded Stamp'}"><b>${fitCount(key)}</b><span class="lbl-st">Stamps</span><span class="fci">${h}<img class="atom" src="${IMG.Particle}" alt=""></span>${g ? `<span class="fci">+<img class="gs" src="${IMG.GildedStamp}" alt=""></span>` : ''}</button>`).join('');
+      `<button type="button" class="fc${g ? ' gold' : ''}" data-k="${key}" aria-pressed="${key === k}" aria-label="${fitCount(key)} with Hydrogen ${h}${g ? ' and a Gilded Stamp' : ', no Gilded Stamp'}"><b>${fitCount(key)}</b><span class="lbl-st">Stamps</span><span class="fci">${h}<img class="atom" src="${IMG.Particle}" alt=""></span>${g ? `<span class="fci">+<img class="gs" src="${IMG.GildedStamp}" alt=""></span>` : ''}</button>`).join('')
+      + (cv ? `<button type="button" class="fc custom" data-k="custom" aria-pressed="${k === 'custom'}" aria-label="${fitCount('custom')} with a custom reduction: Hydrogen ${cv.h}%${cv.g ? ' and a Gilded Stamp' : ', no Gilded Stamp'}"><b>${fitCount('custom')}</b><span class="lbl-st">Stamps</span><span class="ctag">Custom</span><span class="fci">${cv.h}%<img class="atom" src="${IMG.Particle}" alt=""></span>${cv.g ? `<span class="fci">+<img class="gs" src="${IMG.GildedStamp}" alt=""></span>` : ''}</button>` : '');
     const groupRow = (t) => `<tr class="group"><td colspan="13">${t}</td></tr>`;
     let html = '';
     if (pri.length) html += groupRow('★ Priorities') + pri.map(r => rowHtml(r, k)).join('') + (rest.length ? groupRow('Other stamps') : '');
@@ -522,7 +570,7 @@ td.farm .sub{margin-top:4px}
     document.head.appendChild(s);
   });
   // The save comes from the shared Account page (assets/site.js); the result is cached per save.
-  const CACHE_VERSION = 'stamps-v1';
+  const CACHE_VERSION = 'stamps-v2';
   let loadSeq = 0;
   let loading = !!window.IdleonTools;
   async function loadFromAccount(){
@@ -555,6 +603,14 @@ td.farm .sub{margin-top:4px}
   }
 
   $('planSummary').addEventListener('click', (e) => { const btn = e.target.closest('button[data-k]'); if (btn) { sk = btn.dataset.k; renderPlan(); } });
+  $('cGsImg').src = IMG.GildedStamp || ''; $('cAtomImg').src = IMG.Particle || '';
+  $('cGilded').addEventListener('change', (e) => { cg = e.target.checked; renderPlan(); });
+  $('cHydro').addEventListener('input', (e) => {
+    const v = parseFloat(e.target.value);
+    if (!Number.isFinite(v)) return;
+    ch = Math.min(90, Math.max(0, v)); renderPlan();
+  });
+  $('cHydro').addEventListener('change', (e) => { e.target.value = customVals().h; });
   ['fReach','fOwned','fExalt'].forEach(id => $(id).addEventListener('change', renderPlan));
   $('fText').addEventListener('input', renderPlan);
   document.querySelectorAll('#planTable th.sortable').forEach(th => {

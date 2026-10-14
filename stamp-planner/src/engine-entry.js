@@ -2,6 +2,8 @@ import './polyfills';
 import { parseData } from '@parsers/index';
 import { evaluateStamp, getGoldCostToMaxLevel, getStampsPerDay, getExaltedStampBonus } from '@parsers/world-1/stamps';
 import { items, monsterDrops } from '@website-data';
+import { getSigilBonus, getVialsBonusByEffect } from '@parsers/world-2/alchemy';
+import { getMeritocracyBonus } from '@parsers/world-2/voteBallot';
 
 // Rare drops: crafting materials whose best source is a regular mob with under 1% drop chance
 // (chests excluded), e.g. Glass Shard from Sandy Pot. These are farmed with candy.
@@ -35,6 +37,19 @@ const SCEN = [
   ['now', false, 0], ['h70', false, 70], ['h90', false, 90],
   ['g', true, 0], ['g70', true, 70], ['g90', true, 90],
 ];
+// Material cost before the Gilded Stamp, Hydrogen and the vial (IdleonToolbox getMaterialCost), so the
+// page can apply any custom Gilded / Hydrogen choice itself: see matCost() in page-body.html.
+const costFactors = (account) => {
+  const vial = getVialsBonusByEffect(account?.alchemy?.vials, 'material_cost_for_stamps');
+  const sigil = getSigilBonus(account?.alchemy?.p2w?.sigils, 'ENVELOPE_PILE') ?? 0;
+  return {
+    base: (1 / (1 + getMeritocracyBonus(account, 14) / 100)) * (1 / (1 + sigil / 100)),
+    vr: Math.max(0.1, 1 - vial / 100),
+  };
+};
+const preCost = (level, s, base) => s.baseMatCost * base
+  * Math.pow(s.powMatBase, Math.pow(Math.max(0, Math.round(level / s.reqItemMultiplicationLevel) - 1), 0.8));
+
 const allStamps = (account) => Object.values(account.stamps || {}).flat();
 const clean = (s) => String(s ?? '').replace(/_/g, ' ').replace(/[{}]/g, '').trim();
 
@@ -90,6 +105,7 @@ export const compute = (input) => {
   Object.entries(account.stamps || {}).forEach(([tree, list]) => (list || []).forEach((st, idx) => {
     if (account?.compass?.exaltedStamps?.[tree]?.[idx]) exaltedSet.add(st.rawName);
   }));
+  const cf = costFactors(account);
   const stamps = allStamps(account).filter(s => s.level > 0).map(s => {
     const cs = {}, rr = {}, gr = {}, mr = {};
     let cap = 0, w = '';
@@ -101,12 +117,19 @@ export const compute = (input) => {
       rr[k] = t; mr[k] = mats;
       gr[k] = getGoldCostToMaxLevel({ ...s, maxLevel: top + t * s.reqItemMultiplicationLevel }, account);
     }
+    // Custom reduction: pre-costs of the current tier and of every tier the strongest reduction
+    // (Gilded + 90%) can still reach, plus one, and the coin cost up to each of those tiers.
+    const pt = [], gt = [];
+    for (let i = 0; i <= rr.g90; i++) {
+      pt.push(preCost(top + i * s.reqItemMultiplicationLevel, s, cf.base));
+      gt.push(i === rr.g90 ? gr.g90 : getGoldCostToMaxLevel({ ...s, maxLevel: top + i * s.reqItemMultiplicationLevel }, account));
+    }
     const nextTarget = s.level < s.maxLevel ? s.maxLevel : s.level + s.reqItemMultiplicationLevel;
     return {
       r: s.rawName, n: clean(s.displayName ?? s.name), c: s.category, e: clean(s.effect),
       l: s.level, m: s.maxLevel, k: s.reqItemMultiplicationLevel,
       i: clean(s.itemReq?.name), ir: s.itemReq?.rawName, t: items?.[s.itemReq?.rawName]?.typeGen ?? '', rd: isRareDrop(s.itemReq?.rawName), mc: materialCategory(s.itemReq?.rawName), q: (s.materials?.length ?? 0) > 0,
-      o: s.ownedMats ?? 0, cap, w, cs,
+      o: s.ownedMats ?? 0, cap, w, cs, p0: preCost(s.level, s, cf.base), pt, gt,
       rg: rr.g90, rh: rr.h90, rr, gr, mr,
       gn: getGoldCostToMaxLevel({ ...s, maxLevel: nextTarget }, account), nt: nextTarget,
       cy: CARRY.includes(s.rawName),
@@ -118,6 +141,7 @@ export const compute = (input) => {
       save: raw.savedAt ?? null,
       h: { level: h?.level ?? 0, baseBonus: h?.baseBonus ?? 0, days: account?.accountOptions?.[134] ?? 0, value: account?.atoms?.stampReducer ?? 0 },
       gilded: account?.accountOptions?.[154] ?? 0,
+      vr: cf.vr,
       nslb: getStampsPerDay(account)?.value ?? 0,
       chars: characters.length,
       money: account?.currencies?.rawMoney ?? 0,
