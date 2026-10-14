@@ -14,8 +14,6 @@
     <span>Export your account from IdleonToolbox as JSON and import it once on the <a href="../account/">Account page</a>. Every tool on this site uses it; nothing is uploaded anywhere.</span>
   </div>
   <div class="strip" id="factStrip">
-    <div class="fact h"><span class="k">Hydrogen</span><span class="v">+<span id="hPerDay"></span>% / day</span><span class="s">Atom level <span id="hLvl"></span>. Now at <span id="hNow"></span>% (day <span id="hDays"></span>). Cap 90%. Resets on every material upgrade.</span></div>
-    <div class="fact g"><span class="k">Gilded Stamps</span><span class="v"><span id="gOwned"></span> owned</span><span class="s">Each one takes 95% off one upgrade.</span></div>
     <div class="fact x"><span class="k">Exalted Stamps</span><span class="v"><span id="xCount"></span> exalted</span><span class="s">Their bonus is multiplied by <span id="xMulti"></span> (Compass). Marked with a pink frame below.</span></div>
     <div class="fact"><span class="k">Coins</span><span class="v" id="money"></span><span class="s">Biggest coins first, 100 of one coin make the next. Coin costs above this show in red.</span></div>
     <div class="fact"><span class="k">No Stamp Left Behind</span><span class="v"><span id="nslb"></span> levels / day</span><span class="s">Free random levels. They also push stamps into higher-cost tiers over time.</span></div>
@@ -37,6 +35,25 @@
 
 <section aria-labelledby="planH" id="planSec">
   <h2 id="planH">Upgrade planner</h2>
+  <div class="reducers" aria-label="Your cost reductions right now">
+    <div class="red h">
+      <span class="redimg"><img id="hImg" alt=""></span>
+      <div class="redbody">
+        <span class="k">Hydrogen · cost reduction now</span>
+        <span class="v"><span id="hNow"></span>%<span class="of"> of 90% cap</span></span>
+        <div class="meter" aria-hidden="true"><i id="hBar"></i><b style="left:77.78%" title="70%"></b></div>
+        <span class="s" id="hNote"></span>
+      </div>
+    </div>
+    <div class="red g">
+      <span class="redimg"><img id="gImg" alt=""></span>
+      <div class="redbody">
+        <span class="k">Gilded Stamps</span>
+        <span class="v"><span id="gOwned"></span> owned</span>
+        <span class="s" id="gNote"></span>
+      </div>
+    </div>
+  </div>
   <div class="controls">
     <div class="fitcounts" id="planSummary" role="group" aria-label="Reduction: number of stamps whose next tier fits in a character's inventory"></div>
     <label class="chk"><input type="checkbox" id="fReach" checked> Hide out of reach</label>
@@ -67,7 +84,7 @@
   <p>"Tiers in reach" counts how many more material upgrades fit, holding your current capacity fixed. In the carry capacity table it uses Gilded + 90%; in the planner it follows the reduction you picked. Gear stamps (bags, tools, armour) count items, and each takes a whole slot.</p>
   <p>"Coins to next tier" is the coin cost of the levels between now and the next material upgrade: up to your current max level, or, if you're already at max, the levels the next material upgrade unlocks. "Coins to out of reach" adds up every coin level up to the last tier you can still carry; red means it is more than you have.</p>
   <p>"In storage" is what sits in your storage chest. Many materials are at 1.05B, while upgrades here often need tens of billions, so storage is a second wall on top of carry capacity.</p>
-  <p>Importing runs the IdleonToolbox parser in your browser; the file never leaves this page. The last import is remembered in this browser only.</p>
+  <p>The save comes from the Account page and runs through the IdleonToolbox parser in your browser; it is never uploaded. The result is kept in this browser until you import a newer save.</p>
 </section>
 </div>
 <script id="data" type="application/json">__DATA__</script>
@@ -184,11 +201,19 @@
 
   function renderHeader(){
     const h = D.meta.h;
-    $('hPerDay').textContent = h.level * h.baseBonus;
-    $('hLvl').textContent = h.level;
-    $('hNow').textContent = h.value;
-    $('hDays').textContent = h.days;
+    const perDay = h.level * h.baseBonus, now = Math.min(90, h.value || 0);
+    const daysTo = (target) => perDay > 0 ? Math.ceil((target - now) / perDay) : null;
+    const when = (target) => { const d = daysTo(target); return d == null ? 'never (no Hydrogen levels)' : d <= 0 ? 'reached' : d === 1 ? 'in 1 day' : `in ${d} days`; };
+    $('hImg').src = IMG.Particle || ''; $('gImg').src = IMG.GildedStamp || '';
+    $('hNow').textContent = now;
+    $('hBar').style.width = (now / 90 * 100) + '%';
+    $('hNote').innerHTML = now >= 90
+      ? `At the cap. Spend it: the next material upgrade resets it to 0%.<br>+${perDay}% per day (Atom level ${h.level}).`
+      : `Day ${h.days} since the last material upgrade · +${perDay}% per day (Atom level ${h.level}).<br>70% ${when(70)} · 90% ${when(90)}. Resets to 0% on every material upgrade.`;
     $('gOwned').textContent = D.meta.gilded;
+    $('gNote').textContent = D.meta.gilded > 0
+      ? 'Each one takes 95% off one material upgrade. Pick a Gilded option below to see what fits with one.'
+      : 'None right now. The Gilded options below show what would fit once you have one.';
     $('nslb').textContent = D.meta.nslb;
     $('money').innerHTML = D.meta.money != null ? coinsHtml(D.meta.money, 3) : 'import a save';
     $('xCount').textContent = D.stamps.filter(s => s.x).length;
