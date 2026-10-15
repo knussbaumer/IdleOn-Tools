@@ -35,7 +35,7 @@ def walk(node):
 
 walk(stamps)
 names.update(f'Coins{i}' for i in range(1, 26))
-names.update(['Particle', 'GildedStamp'])  # atom and Gilded Stamp icons for the reduction buttons
+names.update(['Particle', 'GildedStamp', 'MeritBon14'])  # atom and Gilded Stamp icons for the reduction buttons
 
 images = {}
 for name in sorted(names):

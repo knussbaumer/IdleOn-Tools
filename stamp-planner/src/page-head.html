@@ -52,6 +52,17 @@ header{display:flex;flex-direction:column;gap:12px}
 .reducers{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:12px}
 .red{display:grid;grid-template-columns:64px 1fr;gap:14px;align-items:start;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--hydro);border-radius:6px;padding:14px 16px;min-width:0}
 .red.g{border-left-color:var(--gold)}
+.red.mer{border-left-color:var(--exalt)}
+.red.mer .redimg{background:var(--exalt-soft)}
+.red.mer .v{color:var(--exalt)}
+.switch{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;font-size:14px;width:max-content}
+.switch input{position:absolute;opacity:0;width:1px;height:1px}
+.switch .track{position:relative;width:40px;height:22px;border-radius:11px;background:var(--line);transition:background .15s;flex:none}
+.switch .track::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--panel);box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .15s}
+.switch input:checked + .track{background:var(--exalt)}
+.switch input:checked + .track::after{transform:translateX(18px)}
+.switch input:focus-visible + .track{outline:2px solid var(--accent);outline-offset:2px}
+.switch input:disabled + .track{opacity:.6}
 .redimg{display:grid;place-items:center;width:64px;height:64px;border-radius:8px;background:var(--hydro-soft)}
 .red.g .redimg{background:var(--gold-soft)}
 .redimg img{max-width:48px;max-height:48px;object-fit:contain}

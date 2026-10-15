@@ -42,10 +42,21 @@ const SCEN = [
 const costFactors = (account) => {
   const vial = getVialsBonusByEffect(account?.alchemy?.vials, 'material_cost_for_stamps');
   const sigil = getSigilBonus(account?.alchemy?.p2w?.sigils, 'ENVELOPE_PILE') ?? 0;
+  const mb = account?.voteBallot?.meritocracyBonuses?.[14];
+  const merit = { bonus: mb?.value != null ? mb.value * (account?.voteBallot?.meritocracyMult ?? 1) : 0, active: !!mb?.selected,
+    value: mb?.value ?? 0, mult: account?.voteBallot?.meritocracyMult ?? 1 };
   return {
     base: (1 / (1 + getMeritocracyBonus(account, 14) / 100)) * (1 / (1 + sigil / 100)),
     vr: Math.max(0.1, 1 - vial / 100),
+    merit,
+    // extra factor if the Stamp cost Meritocracy wins (1 when it is already active)
+    mf: mb?.selected ? 1 : 1 / (1 + (mb?.value ?? 0) * (account?.voteBallot?.meritocracyMult ?? 1) / 100),
   };
+};
+// Same as the page's matCost(): Gilded, Hydrogen and the vial applied to a pre-reduction cost.
+const matCostFrom = (pre, gilded, h, vr) => {
+  const c = pre * (gilded ? 0.05 : 1) * Math.max(0.1, 1 - h / 100);
+  return Math.floor(Math.max(1, c > 2e9 ? c * vr : Math.floor(Math.floor(c) * vr)));
 };
 const preCost = (level, s, base) => s.baseMatCost * base
   * Math.pow(s.powMatBase, Math.pow(Math.max(0, Math.round(level / s.reqItemMultiplicationLevel) - 1), 0.8));
@@ -117,12 +128,14 @@ export const compute = (input) => {
       rr[k] = t; mr[k] = mats;
       gr[k] = getGoldCostToMaxLevel({ ...s, maxLevel: top + t * s.reqItemMultiplicationLevel }, account);
     }
-    // Custom reduction: pre-costs of the current tier and of every tier the strongest reduction
-    // (Gilded + 90%) can still reach, plus one, and the coin cost up to each of those tiers.
+    // Custom reduction and the Meritocracy preview: pre-costs of the current tier and of every tier the
+    // strongest reduction (Gilded + 90% + Meritocracy) can still reach, plus one, and the coin cost to each.
     const pt = [], gt = [];
-    for (let i = 0; i <= rr.g90; i++) {
-      pt.push(preCost(top + i * s.reqItemMultiplicationLevel, s, cf.base));
-      gt.push(i === rr.g90 ? gr.g90 : getGoldCostToMaxLevel({ ...s, maxLevel: top + i * s.reqItemMultiplicationLevel }, account));
+    for (let i = 0; i <= 200; i++) {
+      const pre = preCost(top + i * s.reqItemMultiplicationLevel, s, cf.base);
+      pt.push(pre);
+      gt.push(getGoldCostToMaxLevel({ ...s, maxLevel: top + i * s.reqItemMultiplicationLevel }, account));
+      if (!(matCostFrom(pre * cf.mf, true, 90, cf.vr) <= cap)) break;
     }
     const nextTarget = s.level < s.maxLevel ? s.maxLevel : s.level + s.reqItemMultiplicationLevel;
     return {
@@ -142,6 +155,7 @@ export const compute = (input) => {
       h: { level: h?.level ?? 0, baseBonus: h?.baseBonus ?? 0, days: account?.accountOptions?.[134] ?? 0, value: account?.atoms?.stampReducer ?? 0 },
       gilded: account?.accountOptions?.[154] ?? 0,
       vr: cf.vr,
+      merit: cf.merit,
       nslb: getStampsPerDay(account)?.value ?? 0,
       chars: characters.length,
       money: account?.currencies?.rawMoney ?? 0,
