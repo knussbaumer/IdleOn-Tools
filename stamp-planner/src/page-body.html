@@ -45,15 +45,6 @@
         <span class="s" id="hNote"></span>
       </div>
     </div>
-    <div class="red mer" id="meritCard">
-      <span class="redimg"><img id="mImg" alt=""></span>
-      <div class="redbody">
-        <span class="k">Meritocracy · Stamp costs</span>
-        <label class="switch"><input type="checkbox" id="meritSw"><span class="track" aria-hidden="true"></span><span id="meritLbl">Preview if it wins</span></label>
-        <span class="v" id="meritV"></span>
-        <span class="s" id="meritNote"></span>
-      </div>
-    </div>
     <div class="red g">
       <span class="redimg"><img id="gImg" alt=""></span>
       <div class="redbody">
@@ -64,6 +55,10 @@
     </div>
   </div>
   <div class="controls">
+    <div class="meritctl" id="meritCard" hidden>
+      <label class="switch"><input type="checkbox" id="meritSw"><span class="track" aria-hidden="true"></span><img id="mImg" alt=""><span id="meritLbl"></span></label>
+      <span class="muted" id="meritNote"></span>
+    </div>
     <div class="fitcounts" id="planSummary" role="group" aria-label="Reduction: number of stamps whose next tier fits in a character's inventory"></div>
     <div class="customctl" id="customCtl" hidden>
       <span class="lbl">Custom reduction</span>
@@ -232,11 +227,12 @@
       const x = 1 + m.bonus / 100;
       $('mImg').src = IMG.MeritBon14 || '';
       $('meritSw').checked = m.active || meritOn; $('meritSw').disabled = m.active;
-      $('meritLbl').textContent = m.active ? 'Active now' : 'Preview if it wins';
-      $('meritV').innerHTML = `${x.toFixed(2)}×<span class="of"> lower material costs</span>`;
+      $('meritLbl').innerHTML = m.active
+        ? `Meritocracy: Stamp costs <b>${x.toFixed(2)}×</b> lower · active now`
+        : `If the Meritocracy Stamp cost vote wins: <b>${x.toFixed(2)}×</b> lower`;
       $('meritNote').textContent = m.active
-        ? `It already won: every cost on this page includes it (${m.value}% × your Meritocracy multi ${m.mult.toFixed(2)}).`
-        : `${m.value}% × your Meritocracy multi ${m.mult.toFixed(2)} = ${Math.round(m.bonus)}%, so material costs are divided by ${x.toFixed(2)}. ${meritOn ? 'Shown in every table below.' : 'Switch it on to see what fits if it wins.'}`;
+        ? `Already in every cost on this page (${m.value}% × your Meritocracy multi ${m.mult.toFixed(2)}).`
+        : `${m.value}% × your Meritocracy multi ${m.mult.toFixed(2)} = ${Math.round(m.bonus)}%, so material costs ÷ ${x.toFixed(2)}. Applies to every button below and the carry table.`;
     }
     $('gNote').textContent = D.meta.gilded > 0
       ? 'Each one takes 95% off one material upgrade. Pick a Gilded option below to see what fits with one.'
