@@ -1172,12 +1172,15 @@ const ICONS = /*__ICONS__*/;
     return { txt: `+${fmt(v)}${String(stat).startsWith('%') ? '%' : ''}${label}`, afk: !!AFK_STAT_NAMES[stat] };
   };
   const galMult = (m, gm) => `<span class="gbs gm" title="podium / copies ×${fmt(m / (gm || 1))} × gallery bonus multi ×${fmt(gm || 1)}">×${fmt(m)} multi</span>`;
-  const galBonusList = (raw, mult, onlyAfk, noName) => {
-    const list = (analysis.gallery?.items?.[raw] || []).map((s) => galBonus(s, mult, noName)).filter((b) => !onlyAfk || b.afk);
+  const galBonusList = (raw, mult, onlyAfk, noName, statOk) => {
+    const list = (analysis.gallery?.items?.[raw] || []).filter((s) => !statOk || statOk(s[0])).map((s) => galBonus(s, mult, noName)).filter((b) => !onlyAfk || b.afk);
     return list.map((b) => `<span class="gb${b.afk ? ' afk' : ''}">${esc(b.txt)}</span>`).join(' ');
   };
   const itemName = (raw) => ICONS['n:' + raw] || pretty(raw);
   const statsOf = (raw) => String(ICONS['s:' + raw] || '').split(',').filter((s) => AFK_STAT_NAMES[s]).map((s) => AFK_STAT_NAMES[s]).join(', ');
+  const MULTI_STAT = '%_AFK_GAINS_MULTI';
+  const galHas = (raw, ok) => (analysis.gallery?.items?.[raw] || []).some(([s]) => ok(s));
+  let GAL_TABLE = null; // (kind, statOk) => table html, set by galleryPanel for the AFK row details
   const galleryPanel = (skill, char) => {
     const g = analysis.gallery; if (!g) return '<p class="dnote">Import your save again to see the gallery comparison.</p>';
     const players = BENCH.skills[skill].players.map((p) => ({ name: p.player, g: BENCH.gallery?.[p.player] }));
@@ -1211,10 +1214,10 @@ const ICONS = /*__ICONS__*/;
     players.forEach((p) => (p.g?.trophies || []).forEach((x) => trophyRaws.includes(x.raw) || trophyRaws.push(x.raw)));
     players.forEach((p) => (p.g?.inventory || []).forEach((x) => trophyRaws.includes(x) || trophyRaws.push(x)));
     const myGM = gmTotal(myParts);
-    const trophyRows = trophyRaws.map((raw) => {
+    const trophyRows = (ok) => trophyRaws.filter((raw) => galHas(raw, ok)).map((raw) => {
       const m = where(g, raw);
       const mine = m ? (m.lv === 0.3 ? 0.3 : PODIUM_MULTI[m.lv]) * myGM : null;
-      return `<tr><td>${ic(raw)}${esc(itemName(raw))}<span class="gbs"><span class="src-ctx">base </span>${galBonusList(raw, 1, true, false)}</span></td><td>${m ? m.txt : '<span class="lvl none">not placed</span>'}${m ? galMult(mine, myGM) + `<span class="gbs">${galBonusList(raw, mine, true, true)}</span>` : ''}</td>${players.map((p, i) => { const w = p.g ? where(p.g, raw) : null; const pm = w ? (w.lv === 0.3 ? 0.3 : PODIUM_MULTI[w.lv]) * (gmTotal(pParts[i]) || 1) : 0; return `<td class="${w && (!m || w.lv > m.lv) ? 'better' : ''}">${w ? w.txt + galMult(pm, gmTotal(pParts[i])) + `<span class="gbs">${galBonusList(raw, pm, true, true)}</span>` : '<span class="lvl">–</span>'}</td>`; }).join('')}</tr>`;
+      return `<tr><td>${ic(raw)}${esc(itemName(raw))}<span class="gbs"><span class="src-ctx">base </span>${galBonusList(raw, 1, true, false, ok)}</span></td><td>${m ? m.txt : '<span class="lvl none">not placed</span>'}${m ? galMult(mine, myGM) + `<span class="gbs">${galBonusList(raw, mine, true, true, ok)}</span>` : ''}</td>${players.map((p, i) => { const w = p.g ? where(p.g, raw) : null; const pm = w ? (w.lv === 0.3 ? 0.3 : PODIUM_MULTI[w.lv]) * (gmTotal(pParts[i]) || 1) : 0; return `<td class="${w && (!m || w.lv > m.lv) ? 'better' : ''}">${w ? w.txt + galMult(pm, gmTotal(pParts[i])) + `<span class="gbs">${galBonusList(raw, pm, true, true, ok)}</span>` : '<span class="lvl">–</span>'}</td>`; }).join('')}</tr>`;
     }).join('');
     const myPodiums = [4, 3, 2, 1].map((lv) => { const list = (g.trophies || []).filter((x) => !x.empty && (x.level || 1) === lv); return list.length ? `<div style="margin:2px 0"><span class="src-ctx">Level ${lv}:</span> ${list.map((x) => `<span title="${esc(itemName(x.raw) + (isAfkItem(x) ? ' (AFK)' : ''))}" style="display:inline-block;${isAfkItem(x) ? 'box-shadow:inset 0 0 0 2px #2f9e5a;border-radius:5px;' : ''}">${ic(x.raw, true)}</span>`).join('')}</div>` : ''; }).join('');
     // Nametags with an AFK stat: deposits (1 to 5 raise the bonus).
@@ -1223,11 +1226,17 @@ const ICONS = /*__ICONS__*/;
     players.forEach((p) => Object.keys(p.g?.nametags || {}).forEach((r) => ntRaws.includes(r) || ntRaws.push(r)));
     const lvCell = (n) => (n == null ? '<span class="lvl none">missing</span>' : `<span class="lvl ${n >= 5 ? 'full' : 'low'}" title="${n} deposited">${Math.min(n, 5)}/5 ×${NAMETAG_MULTI[Math.min(n, 5) - 1]}</span>`);
     const ntMult = (n, gm) => (n ? NAMETAG_MULTI[Math.min(n, 5) - 1] * (gm || 1) : 0);
-    const ntRows = ntRaws.map((raw) => {
+    const ntRows = (ok) => ntRaws.filter((raw) => galHas(raw, ok)).map((raw) => {
       const mine = (g.nametags || []).find((x) => x.raw === raw)?.level ?? null;
       const mm = ntMult(mine, myGM);
-      return `<tr><td>${ic(raw)}${esc(itemName(raw))}<span class="gbs"><span class="src-ctx">base </span>${galBonusList(raw, 1, true, false)}</span></td><td>${lvCell(mine)}${mine ? galMult(mm, myGM) + `<span class="gbs">${galBonusList(raw, mm, true, true)}</span>` : ''}</td>${players.map((p, i) => { const n = p.g?.nametags?.[raw] ?? null; return `<td class="${n != null && Math.min(n, 5) > Math.min(mine ?? 0, 5) ? 'better' : ''}">${lvCell(n)}${n ? galMult(ntMult(n, gmTotal(pParts[i])), gmTotal(pParts[i])) + `<span class="gbs">${galBonusList(raw, ntMult(n, gmTotal(pParts[i])), true, true)}</span>` : ''}</td>`; }).join('')}</tr>`;
+      return `<tr><td>${ic(raw)}${esc(itemName(raw))}<span class="gbs"><span class="src-ctx">base </span>${galBonusList(raw, 1, true, false, ok)}</span></td><td>${lvCell(mine)}${mine ? galMult(mm, myGM) + `<span class="gbs">${galBonusList(raw, mm, true, true, ok)}</span>` : ''}</td>${players.map((p, i) => { const n = p.g?.nametags?.[raw] ?? null; return `<td class="${n != null && Math.min(n, 5) > Math.min(mine ?? 0, 5) ? 'better' : ''}">${lvCell(n)}${n ? galMult(ntMult(n, gmTotal(pParts[i])), gmTotal(pParts[i])) + `<span class="gbs">${galBonusList(raw, ntMult(n, gmTotal(pParts[i])), true, true, ok)}</span>` : ''}</td>`; }).join('')}</tr>`;
     }).join('');
+    const isMultiStat = (s) => s === MULTI_STAT, isAddStat = (s) => !!AFK_STAT_NAMES[s] && s !== MULTI_STAT;
+    const table = (kind, ok, title) => {
+      const body = kind === 'trophy' ? trophyRows(ok) : ntRows(ok);
+      return body ? `${title}<div class="scroll"><table class="minitable"><thead><tr><th>${kind === 'trophy' ? 'Trophy' : 'Nametag (copies deposited)'}</th><th class="num">You</th>${players.map((p) => `<th class="num">${esc(p.name)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>` : '';
+    };
+    GAL_TABLE = (kind, ok) => table(kind, ok, '');
     const gmOpen = openRows.has(skill + 'galmulti');
     const gmRows = GM.map(([k, icon, label, f, how, lvl]) => {
       const mine = f(myParts[k] || 0); const theirs = pParts.map((pp) => (pp ? f(pp[k] || 0) : null));
@@ -1250,12 +1259,20 @@ const ICONS = /*__ICONS__*/;
       <h3>Podiums and hat rack</h3>
       ${summary}
       <p class="dnote">Each trophy and nametag shows its AFK bonus: the base value under its name, and in each column the total multi (podium level or copies deposited × that account's gallery bonus multi; hover it for the split) and the bonus that gives (yours: ${fmt(gmTotal({ ...(g.multiParts || {}), chip: char?.loadout?.galleryChip ?? 0 }))}×). <strong>+</strong> adds to a stat, <strong>×</strong> multiplies it. The AFK bonus is highlighted and also shown for each top account at their podium level and gallery multi. Items you have not placed show their base value.</p>
-      <h3>Trophies with AFK gains</h3>${trophyRows ? `<div class="scroll"><table class="minitable"><thead><tr><th>Trophy</th><th class="num">You</th>${players.map((p) => `<th class="num">${esc(p.name)}</th>`).join('')}</tr></thead><tbody>${trophyRows}</tbody></table></div>` : ''}
+      ${table('trophy', isMultiStat, '<h3>Trophies that add to the AFK gains multi</h3><p class="dnote">Their % is added into the one AFK gains multi (with nametags, hat rack and gear), which then multiplies all your AFK gains.</p>')}
+      ${table('trophy', isAddStat, '<h3>Trophies with additive AFK gains</h3><p class="dnote">Their % is added to your AFK gains %, like most other AFK sources.</p>')}
       <div><span class="dnote">Your podiums (AFK trophies framed green):</span>${myPodiums}</div>
-      <h3>Nametags with AFK gains</h3>${ntRows ? `<div class="scroll"><table class="minitable"><thead><tr><th>Nametag (copies deposited)</th><th class="num">You</th>${players.map((p) => `<th class="num">${esc(p.name)}</th>`).join('')}</tr></thead><tbody>${ntRows}</tbody></table></div>` : ''}
+      ${table('nametag', isMultiStat, '<h3>Nametags that add to the AFK gains multi</h3><p class="dnote">Their % is added into the one AFK gains multi (with trophies, hat rack and gear), which then multiplies all your AFK gains.</p>')}
+      ${table('nametag', isAddStat, '<h3>Nametags with additive AFK gains</h3><p class="dnote">Their % is added to your AFK gains %, like most other AFK sources.</p>')}
     </article>`;
   };
-  const galleryDetail = (r) => (r.part === 'trophies' || r.part === 'nametags' || r.part === 'hatRack' ? '<p class="dnote">See the Gallery and hat rack panel above the table for every trophy, nametag and the hat count.</p>' : '');
+  const galleryDetail = (r) => {
+    if ((r.part === 'trophies' || r.part === 'nametags') && GAL_TABLE && r.stat) {
+      const html = GAL_TABLE(r.part === 'trophies' ? 'trophy' : 'nametag', (s) => s === r.stat);
+      return html ? `<p class="dnote">Every ${r.part === 'trophies' ? 'trophy' : 'nametag'} that gives this, with its base value, each account's total multi and what it adds:</p>${html}` : '<p class="dnote">None of your or the top accounts\' items give this.</p>';
+    }
+    return r.part === 'hatRack' ? '<p class="dnote">See the Gallery and hat rack panel above the table for the hat count.</p>' : '';
+  };
   const afkSection = (skill, char) => {
     const a = compareAfk(skill, char);
     if (!a) return '<section class="afk"><h2>AFK gains</h2><p class="lede">Import your save again to see the AFK gains comparison.</p></section>';
@@ -1277,8 +1294,8 @@ const ICONS = /*__ICONS__*/;
         <td class="num">${pre}${fmt(r.value)}${u}</td><td class="num">${r.med == null || Number.isNaN(r.med) ? '–' : pre + fmt(r.med) + u}</td><td class="num">${r.best ? pre + fmt(r.best.value) + u + `<div class="who">${esc(r.best.player)}</div>` : '–'}</td>
         <td class="num"><div class="gain"><div class="bar" aria-hidden="true"><i style="width:${width}%"></i></div><span>${r.best ? fmtX(g) : '–'}</span></div></td><td>${st}</td></tr>`;
       if (isOpen) out += `<tr class="detail"><td colspan="6"><div class="dwrap"><div class="dsec"><h3>${afkIcons(r, skill).map((x) => ic(x, true)).join('')}${esc(r.name)}</h3>${desc(r) ? `<p class="dnote">${esc(desc(r))}</p>` : ''}${galleryDetail(r)}</div><div class="dsec"><div class="scroll"><table class="minitable"><thead><tr><th>Player</th><th>Character</th><th class="num">Value</th><th class="num">Your AFK gains if matched</th></tr></thead><tbody>
-        <tr class="you"><td>You</td><td>${esc(char.name)}</td><td class="num">${fmt(r.value)}${u}</td><td class="num">1×</td></tr>
-        ${r.theirs.map((t) => `<tr><td>${esc(t.player)}</td><td>${esc(t.char)}</td><td class="num">${fmt(t.value)}${u}</td><td class="num">${typeof t.gain === 'number' ? fmtX(t.gain) : '–'}</td></tr>`).join('')}</tbody></table></div></div></div></td></tr>`;
+        <tr class="you"><td>You</td><td>${esc(char.name)}</td><td class="num">${pre}${fmt(r.value)}${u}</td><td class="num">1×</td></tr>
+        ${r.theirs.map((t) => `<tr><td>${esc(t.player)}</td><td>${esc(t.char)}</td><td class="num">${typeof t.value === 'number' ? pre + fmt(t.value) + u : '–'}</td><td class="num">${typeof t.gain === 'number' ? fmtX(t.gain) : '–'}</td></tr>`).join('')}</tbody></table></div></div></div></td></tr>`;
       return out;
     };
     return `<section class="afk" style="display:grid;gap:14px"><h2>AFK gains</h2>
