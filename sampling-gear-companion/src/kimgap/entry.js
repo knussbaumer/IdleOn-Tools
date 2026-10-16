@@ -240,6 +240,7 @@ export const starTalentCheck = (c, characters, account, skill, pi, loadout) => {
   for (const t of v.flatStarTalents || []) {
     const vip = VIP_BOOKS[t?.name] ?? null;
     const libUp = vip != null && bookMax && (t.maxLevel ?? 0) < bookMax;
+    // maxLevel 0 or below: the VIP book was never read (or the VIP Bookshelf is not unlocked yet).
     if (!t?.name || /^_|FILLER/.test(t.name) || !(t.maxLevel > 0 || libUp) || !((t.level || 0) < t.maxLevel || libUp)) continue;
     // Relevant if the talent does anything for this skill at all (0 against max), however little is left.
     const txt = talentText(t);
@@ -250,11 +251,11 @@ export const starTalentCheck = (c, characters, account, skill, pi, loadout) => {
     const full = compare(skill, v, c, characters, account, pi, z, zS, t.skillIndex, 0, top, null, null, t);
     // Ubercharged Health raises base HP, which only counts through the HP snapshot (Hearty Diggy); always check it for mining.
     if (!meaningful(full, 1e-6) && !(skill === 'mining' && t.name === 'UBERCHARGED_HEALTH')) continue;
-    const r = (t.level || 0) < t.maxLevel ? compare(skill, v, c, characters, account, pi, base, baseS, t.skillIndex, t.level || 0, t.maxLevel, null, null, t) : { eff: 1, afk: 1, effS: 1, power: 0, sample: 1, sampleS: 1 };
-    const toLib = libUp ? { from: t.maxLevel, to: bookMax, ...compare(skill, v, c, characters, account, pi, base, baseS, t.skillIndex, t.level || 0, bookMax, null, null, t) } : null;
+    const r = (t.maxLevel ?? 0) > 0 && (t.level || 0) < t.maxLevel ? compare(skill, v, c, characters, account, pi, base, baseS, t.skillIndex, t.level || 0, t.maxLevel, null, null, t) : { eff: 1, afk: 1, effS: 1, power: 0, sample: 1, sampleS: 1 };
+    const toLib = libUp ? { from: Math.max(0, t.maxLevel ?? 0), unread: !((t.maxLevel ?? 0) > 0), to: bookMax, ...compare(skill, v, c, characters, account, pi, base, baseS, t.skillIndex, t.level || 0, bookMax, null, null, t) } : null;
     // Highest max level any of your characters has for this star talent.
     const best = Math.max(...(characters || []).map((x) => (x.flatStarTalents || []).find((y) => y?.skillIndex === t.skillIndex)?.maxLevel ?? 0));
-    list.push({ skillIndex: t.skillIndex, name: t.name, level: t.level || 0, maxLevel: t.maxLevel, bestMax: best, description: t.description, vip, bookMax, toLib, notMaxed: (t.level || 0) < t.maxLevel, ...r });
+    list.push({ skillIndex: t.skillIndex, name: t.name, level: t.level || 0, maxLevel: t.maxLevel, bestMax: best, description: t.description, vip, bookMax, toLib, notMaxed: (t.maxLevel ?? 0) > 0 && (t.level || 0) < t.maxLevel, ...r });
   }
   list.sort((a, b) => b.sampleS - a.sampleS);
   return list;
@@ -265,6 +266,9 @@ export const rightHandCheck = (c, characters, account, skill, pi) => {
   const vman = (characters || []).filter((x) => ['Maestro', 'Voidwalker'].includes(x?.class)).at(-1);
   if (!vman) return { vman: null };
   const myLv = c?.skillsInfo?.[skill]?.level ?? 0, vLv = vman?.skillsInfo?.[skill]?.level ?? 0;
+  // A Maestro without points in the talent gives nothing either way.
+  const talentLv = (vman.flatTalents || []).find((x) => x?.name === 'RIGHT_HAND_OF_ACTION')?.level ?? 0;
+  if (!(talentLv > 0)) return { vman: vman.name, cls: vman.class, noTalent: true, myLv, vLv };
   if (vman.name === c.name) return { vman: vman.name, self: true, myLv, vLv };
   const active = myLv < vLv;
   let gain = null;

@@ -317,7 +317,7 @@ const ICONS = /*__ICONS__*/;
   };
 
   // The save comes from the shared Account page (assets/site.js). The analysis takes ~10 s, so it is cached per save.
-  const CACHE_VERSION = 'v6-' + BENCH.createdAt;
+  const CACHE_VERSION = 'v7-' + BENCH.createdAt;
   let loadSeq = 0;
   const loadFromAccount = async () => {
     const T = window.IdleonTools;
@@ -903,6 +903,7 @@ const ICONS = /*__ICONS__*/;
   const superHtml = (skill, char) => {
     const sp = char?.supers?.[skill];
     if (!sp) return `<article class="setup"><h3>Super talent priority</h3><p class="dnote">${char?.loadout ? 'Worked out for characters of this skill\'s class family and your best sampler. Pick one of those above.' : 'Import your save again to see this.'}</p></article>`;
+    if (!sp.bonus) return `<article class="setup"><h3>Super talent priority</h3><p class="dnote">Super talents are not unlocked on this account yet, so there is nothing to rank. Once they are, this shows which talents to super first.</p></article>`;
     if (!sp.list.some((t) => t.sup)) return superHtmlOld(skill, char, sp);
     const lab = SK_ICON[skill].label.toLowerCase();
     const res = SNAP_RES[skill];
@@ -943,14 +944,16 @@ const ICONS = /*__ICONS__*/;
     const row = (cls, icon, html) => `<div class="chk-row ${cls}">${icon ? `<img class="ico" src="${ICONS[icon] || ''}" alt="">` : '<span></span>'}<div class="t">${html}</div></div>`;
     const out = [];
     const h = char?.hand?.[skill];
-    if (h && h.vman && !h.self) {
+    if (h && h.vman && !h.self && !h.noTalent) {
       if (!h.active) out.push(row('warn', 'UISkillIcon43', `<strong>Right Hand of Action is off for ${esc(char.name)}.</strong>
         <span>Its ${low} level (${h.myLv}) is not below the Voidwalker ${esc(h.vman)}'s (${h.vLv}). The talent only works on characters with a lower ${low} level than the Voidwalker.${h.gain ? ` Turning it back on is worth <strong>${fmtX(h.gain)} ${low} efficiency</strong>.` : ''}</span>
         <span class="muted">Level ${esc(h.vman)}'s ${low} above ${h.myLv}, or sample with a character below ${h.vLv}.</span>`));
       else if (h.vLv - h.myLv <= 5) out.push(row('soft', 'UISkillIcon43', `<strong>Right Hand of Action: only ${h.vLv - h.myLv} ${h.vLv - h.myLv === 1 ? 'level' : 'levels'} left.</strong>
         <span>${esc(char.name)} is ${low} level ${h.myLv}, the Voidwalker ${esc(h.vman)} is ${h.vLv}. Once ${esc(char.name)} reaches ${h.vLv}, the talent stops working for it. Keep ${esc(h.vman)}'s ${low} ahead.</span>`));
       else out.push(row('', 'UISkillIcon43', `<strong>Right Hand of Action is on.</strong> <span class="muted">${esc(char.name)} ${low} ${h.myLv}, below the Voidwalker ${esc(h.vman)}'s ${h.vLv}.</span>`));
-    } else if (h && h.self) out.push(row('', 'UISkillIcon43', `<strong>This is the Voidwalker.</strong> <span class="muted">Right Hand of Action only counts on itself with Enhancement Eclipse.</span>`));
+    } else if (h && !h.vman) out.push(row('', 'UISkillIcon43', `<strong>No Maestro on this account yet.</strong> <span class="muted">Right Hand of Action comes from the Maestro / Voidwalker talent. Once you have one, it boosts ${low} on characters with a lower ${low} level.</span>`));
+    else if (h && h.noTalent) out.push(row('soft', 'UISkillIcon43', `<strong>Right Hand of Action has no points.</strong> <span>${esc(h.vman)} (${esc(pretty(h.cls || ''))}) has not levelled the talent, so it gives nothing yet. Once it does, it boosts ${low} on characters below ${esc(h.vman)}'s ${low} level (${h.vLv}).</span>`));
+    else if (h && h.self) out.push(row('', 'UISkillIcon43', `<strong>This is the Voidwalker.</strong> <span class="muted">Right Hand of Action only counts on itself with Enhancement Eclipse.</span>`));
     const stars = char?.stars?.[skill];
     const sp = char?.supers?.[skill];
     const pre = sp ? ` on talent preset ${(sp.talentPreset ?? 0) + 1}` : '';
@@ -966,7 +969,7 @@ const ICONS = /*__ICONS__*/;
       const snapTag = (s) => (resName && (s.name === 'UBERCHARGED_HEALTH' || (s.toLib?.effS || 1) > (s.toLib?.eff || 1) * 1.00005 || (s.effS || 1) > (s.eff || 1) * 1.00005) ? ` <span class="pill even">${resName} snapshot</span>` : '');
       const notMax = stars.filter((s) => s.notMaxed && s.maxLevel <= 10000), open = stars.filter((s) => s.notMaxed && s.maxLevel > 10000), vipUp = stars.filter((s) => s.toLib);
       const li = (s) => `<li>${ic('UISkillIcon' + s.skillIndex)} <strong>${esc(tname(s.name))}</strong>${snapTag(s)} ${fmt(s.level)} / ${fmt(s.maxLevel)} · ${s.maxLevel > 10000 ? 'even fully maxed: ' : 'maxing it: '}${gainOf(s)}</li>`;
-      const vli = (s) => `<li>${ic('UISkillIcon' + s.skillIndex)} <strong>${esc(tname(s.name))}</strong>${snapTag(s)}: max level ${fmt(s.toLib.from)}, a VIP book can take it to ${fmt(s.toLib.to)} (VIP Bookshelf, needs ${fmt(s.vip)}% VIP Membership). Read it, then level it: ${gainOf(s.toLib)}.</li>`;
+      const vli = (s) => `<li>${ic('UISkillIcon' + s.skillIndex)} <strong>${esc(tname(s.name))}</strong>${snapTag(s)}: ${s.toLib.unread ? `its VIP book is not read yet; a book can give it up to ${fmt(s.toLib.to)} levels` : `max level ${fmt(s.toLib.from)}, a VIP book can take it to ${fmt(s.toLib.to)}`} (VIP Bookshelf, needs ${fmt(s.vip)}% VIP Membership). Read it, then level it: ${gainOf(s.toLib)}.</li>`;
       if (notMax.length) out.push(row('warn', 'UISkillIcon' + notMax[0].skillIndex, `<strong>${notMax.length} star ${notMax.length === 1 ? 'talent is' : 'talents are'} not maxed${pre}.</strong><span>They raise ${low}; put star talent points into them.</span><ul>${notMax.map(li).join('')}</ul>`));
       else out.push(row('', null, `<strong>Every star talent that matters for ${low} is maxed${pre}.</strong>`));
       if (vipUp.length) out.push(row('warn', 'UISkillIcon' + vipUp[0].skillIndex, `<strong>Star talents the library can still raise.</strong><span>Seven star talents have books on the library's VIP Bookshelf.</span><ul>${vipUp.map(vli).join('')}</ul>`));
