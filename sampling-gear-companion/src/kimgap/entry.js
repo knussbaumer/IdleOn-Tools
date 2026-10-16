@@ -24,7 +24,7 @@ import { getCardSets } from '@parsers/cards';
 import { calcCardBonus } from '@parsers/cardMath';
 import { getItemCapacity, getGoldenFoodMulti, getGoldenFoodBonus } from '@parsers/misc';
 import { lavaLog } from '@utility/helpers';
-import { getSuperTalentAddedLevels } from '@parsers/talents';
+import { getSuperTalentAddedLevels, isBookEligibleTalent } from '@parsers/talents';
 import { items as ITEMS } from '@website-data';
 
 // Golden food: what this character's bonus would be with a full food-slot stack (carry cap, or what storage holds).
@@ -104,11 +104,79 @@ export const presetCheck = (c, characters, account, skill, pi) => {
   return { current: { talent: curT, card: curC }, best: combos[0], combos };
 };
 
-// Super talents: for every talent of this loadout, how much this skill's efficiency changes with the super
-// talent levels on it (added if it is not supered, removed to measure it if it is). Talents that raise the
-// skill's main stat are estimated: a "+% stat" talent is treated as its own multiplier on the saved total,
-// so its number is an upper bound; flat "+base stat" and gear/obol stat talents cannot be worked out from a
-// save and are listed without a number.
+// Sets one talent (class or star) to a level everywhere IdleonToolbox looks for it.
+const setTalentLevel = (c, skillIndex, level, statFactor, stat) => {
+  const set = (t) => (t?.skillIndex === skillIndex ? { ...t, level } : t);
+  const tabs = (obj) => (obj ? Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, v?.orderedTalents ? { ...v, orderedTalents: v.orderedTalents.map(set) } : v])) : obj);
+  const out = { ...c, flatTalents: (c.flatTalents || []).map(set), talents: tabs(c.talents), flatStarTalents: (c.flatStarTalents || []).map(set) };
+  if (c.starTalents?.orderedTalents) out.starTalents = { ...c.starTalents, orderedTalents: c.starTalents.orderedTalents.map(set) };
+  if (statFactor && stat) out.stats = { ...c.stats, [stat]: (c.stats?.[stat] || 0) * statFactor };
+  return out;
+};
+const g = (t, lv) => { try { return growth(t.funcX, lv, t.x1, t.x2, false); } catch (e) { return null; } };
+// The skill-power multiplier node of an efficiency breakdown ("Mining power" = 1 + power / 100).
+const powerOf = (b) => {
+  let v = null;
+  const walk = (n) => { if (!n || v !== null) return; if (/ power$/.test(n.name || '') && typeof n.value === 'number') { v = (n.value - 1) * 100; return; } (n.children || []).forEach(walk); };
+  (b?.tree || []).forEach(walk);
+  return v;
+};
+const AFK_KIND = { mining: 'MINING', chopping: 'CHOPPIN', catching: 'CATCHING', fishing: 'FISHING' };
+// Efficiency, skill power and AFK gains of a (modified) character. With snapshot set, max HP and MP are
+// worked out again for the modified character, so talents that raise them count through the HP / MP bubbles.
+// Only Mining (Hearty Diggy, max HP) and Chopping (Hocus Choppus, max MP) use a snapshot.
+const SNAP_SKILL = { mining: 'maxHp', chopping: 'maxMp' };
+// Which talents can change AFK gains or max HP / MP at all, read from their description. Only those get
+// the slower AFK and snapshot runs; everything else keeps the base value for them.
+const talentText = (t) => `${t?.name || ''} ${t?.description || ''} ${t?.lvlUpText || ''}`;
+const AFK_RE = /AFK/i;
+const RES_RE = /\bHP\b|\bMP\b|MANA|HEALTH|STR\b|STRENGTH|WIS\b|WISDOM|ALL_STAT|ALL_STATS|STAT/i;
+const skillMetrics = (skill, ch, orig, characters, account, pi, snapshot, plain, opts = {}) => {
+  const chars = ch === orig ? characters : characters.map((x) => (x === orig ? ch : x));
+  if (snapshot) {
+    // Snapshot run: efficiency with this character's own max HP / MP. Talents that cannot change them reuse
+    // the loadout's (opts.snapPi); the run is skipped when it equals the plain one.
+    const key = SNAP_SKILL[skill];
+    if (!key) return { ...plain, res: null, pi };
+    let p;
+    if (opts.noRes) p = opts.snapPi || pi;
+    else if (ch === orig) p = pi;
+    else { try { p = getMaxDamage(ch, chars, account); } catch (e) { p = pi; } }
+    if (!p || p[key] === pi?.[key]) return { ...plain, res: p?.[key] ?? pi?.[key] ?? null, pi: p || pi };
+    let eff = null; try { eff = getSkillEfficiency(skill, ch, chars, account, p)?.value ?? null; } catch (e) {}
+    return { ...plain, eff, res: p[key], pi: p };
+  }
+  let eff = null, power = null, afk = opts.afk ?? null;
+  try { const r = getSkillEfficiency(skill, ch, chars, account, pi); eff = r?.value ?? null; power = powerOf(r?.breakdown); } catch (e) {}
+  if (opts.afk == null) { try { const r = getAfkGain({ ...ch, afkType: AFK_KIND[skill] }, chars, account); afk = r?.afkGains ?? null; } catch (e) {} }
+  return { eff, power, afk, res: SNAP_SKILL[skill] ? pi?.[SNAP_SKILL[skill]] ?? null : null };
+};
+const ratio = (a, b) => (a && b ? a / b : null);
+// Sample size grows one to one with AFK gains and with about efficiency^0.35 (the fishing formula).
+const sampleOf = (effX, afkX) => (effX || 1) ** 0.35 * (afkX || 1);
+// What changes when a talent goes from one level to another: efficiency, power, AFK gains, sample.
+const compare = (skill, v, orig, characters, account, pi, base, baseS, skillIndex, from, to, statFactor, stat, tal) => {
+  const c1 = setTalentLevel(v, skillIndex, to, statFactor, stat);
+  const txt = talentText(tal);
+  const m = skillMetrics(skill, c1, orig, characters, account, pi, false, null, { afk: AFK_RE.test(txt) ? null : base.afk });
+  const ms = skillMetrics(skill, c1, orig, characters, account, pi, true, m, RES_RE.test(txt) ? {} : { noRes: true, snapPi: baseS.pi });
+  const up = to > from;
+  const eff = up ? ratio(m.eff, base.eff) : ratio(base.eff, m.eff);
+  const afk = up ? ratio(m.afk, base.afk) : ratio(base.afk, m.afk);
+  const effS = up ? ratio(ms.eff, baseS.eff) : ratio(baseS.eff, ms.eff);
+  const power = m.power != null && base.power != null ? (up ? m.power - base.power : base.power - m.power) : null;
+  const powerX = m.power != null && base.power != null ? (up ? ratio(1 + m.power / 100, 1 + base.power / 100) : ratio(1 + base.power / 100, 1 + m.power / 100)) : null;
+  const snap = ms.res !== baseS.res;
+  return { eff, afk, effS, power, powerX, snap, sample: sampleOf(eff, afk), sampleS: sampleOf(effS, afk) };
+};
+const meaningful = (r, eps = 0.0005) => r && ((r.eff || 1) > 1 + eps || (r.afk || 1) > 1 + eps || (r.effS || 1) > 1 + eps || Math.abs(r.power || 0) > 0.05);
+
+// Super talents: for every talent of this loadout, what +super levels do for this skill's efficiency, skill
+// power and AFK gains (measured by removing them if the talent is supered). Talents that only matter through
+// max HP / MP (the HP and Mana snapshot bubbles) are flagged so the page can show them on request. "+% stat"
+// talents are estimated as their own multiplier on the saved total (an upper bound); flat stat talents
+// cannot be worked out from a save and are listed without a number. Each talent also gets what levelling it
+// to its max, and to the Talent Book Library's max, would do.
 const MAIN_STAT = { mining: 'strength', fishing: 'strength', chopping: 'wisdom', catching: 'agility' };
 const STAT_PCT = { strength: ['OVERBLOWN_TESTOSTERONE'], agility: ['ADAPTATION_REVELATION'], wisdom: ['UTMOST_INTELLECT'] };
 const STAT_FLAT = {
@@ -116,18 +184,12 @@ const STAT_FLAT = {
   agility: ['QUICKNESS_BOOTS', 'SANIC_SPEED', 'UNREAL_AGILITY', "GARB_OF_UN'AGI'NG_QUALITY", 'SHOEFUL_OF_OBOL'],
   wisdom: ['BOOK_OF_THE_WISE', 'INDIVIDUAL_INSIGHT', 'INDIVIDUALITY', "UNT'WIS'TED_ROBES", 'OCCULT_OBOLS'],
 };
-const withTalentLevels = (c, skillIndex, delta, statFactor, stat) => {
-  const bump = (t) => (t?.skillIndex === skillIndex ? { ...t, level: (t.level || 0) + delta } : t);
-  const talents = c.talents ? Object.fromEntries(Object.entries(c.talents).map(([k, v]) => [k, v?.orderedTalents ? { ...v, orderedTalents: v.orderedTalents.map(bump) } : v])) : c.talents;
-  const out = { ...c, flatTalents: (c.flatTalents || []).map(bump), talents };
-  if (statFactor && stat) out.stats = { ...c.stats, [stat]: (c.stats?.[stat] || 0) * statFactor };
-  return out;
-};
-const g = (t, lv) => { try { return growth(t.funcX, lv, t.x1, t.x2, false); } catch (e) { return null; } };
 export const superTalentPlan = (c, characters, account, skill, pi, loadout) => {
   const v = loadout || c;
-  const base = effOf(skill, v, characters, account, pi, c); if (!base) return null;
+  const base = skillMetrics(skill, v, c, characters, account, pi, false); if (!base.eff) return null;
+  const baseS = skillMetrics(skill, v, c, characters, account, pi, true, base);
   const bonus = c?.superTalentsInfo?.bonus || getSuperTalentAddedLevels(account) || 0;
+  const bookMax = c?.maxBookLv ?? null;
   const stat = MAIN_STAT[skill];
   const out = [], extra = [];
   const seen = new Set();
@@ -135,27 +197,75 @@ export const superTalentPlan = (c, characters, account, skill, pi, loadout) => {
     if (!t || seen.has(t.skillIndex) || !(t.level >= 1) || !t.name || /^_|FILLER/.test(t.name)) continue;
     seen.add(t.skillIndex);
     const isSuper = !!t.isSuperTalent;
-    const delta = isSuper ? -bonus : bonus;
+    const added = Math.max(0, (t.level || 0) - (t.baseLevel ?? t.level));
     let statFactor = null, statNote = null;
     if (STAT_PCT[stat].includes(t.name)) {
-      const b0 = g(t, t.level) || 0, b1 = g(t, t.level + delta) || 0;
+      const to = isSuper ? t.level - bonus : t.level + bonus;
+      const b0 = g(t, t.level) || 0, b1 = g(t, to) || 0;
       statFactor = (1 + b1 / 100) / (1 + b0 / 100);
       statNote = `+${Math.abs(b1 - b0).toFixed(1)}% ${stat} from the super levels (estimated as its own multiplier, so this is an upper bound)`;
     }
-    const item = { skillIndex: t.skillIndex, name: t.name, level: t.level, baseLevel: t.baseLevel, supered: isSuper, description: t.description, value: g(t, t.level), statNote };
+    const item = { skillIndex: t.skillIndex, name: t.name, level: t.level, baseLevel: t.baseLevel, maxLevel: t.maxLevel, supered: isSuper, description: t.description, value: g(t, t.level), statNote };
     if (STAT_FLAT[stat].includes(t.name)) {
       const d = Math.abs((g(t, t.level + bonus) || 0) - (g(t, t.level) || 0));
       extra.push({ ...item, gain: null, statNote: `Raises ${stat}${d ? ' (+' + Math.round(d).toLocaleString('en-US') + ' from the super levels)' : ''}. More ${stat} means bigger samples, but how much depends on your other ${stat} sources, which the save does not break down.` });
       continue;
     }
-    const c2 = withTalentLevels(v, t.skillIndex, delta, statFactor, stat);
-    const val = effOf(skill, c2, characters, account, pi, c);
-    if (!val) continue;
-    const gain = isSuper ? base / val : val / base;
-    if (gain > 1.0005) out.push({ ...item, gain, estimate: !!statFactor });
+    const sup = compare(skill, v, c, characters, account, pi, base, baseS, t.skillIndex, t.level, isSuper ? t.level - bonus : t.level + bonus, statFactor, stat, t);
+    if (!meaningful(sup)) continue;
+    // Levels this talent could still gain: up to its max, and up to the library's max book level.
+    const lvBase = t.baseLevel ?? t.level;
+    const toMax = typeof t.maxLevel === 'number' && t.maxLevel > lvBase
+      ? { from: lvBase, to: t.maxLevel, ...compare(skill, v, c, characters, account, pi, base, baseS, t.skillIndex, t.level, t.maxLevel + added, null, null, t) } : null;
+    const libOk = bookMax && isBookEligibleTalent(t.skillIndex) && typeof t.maxLevel === 'number' && t.maxLevel < bookMax;
+    const toLib = libOk ? { from: t.maxLevel, to: bookMax, ...compare(skill, v, c, characters, account, pi, base, baseS, t.skillIndex, t.level, bookMax + added, null, null, t) } : null;
+    out.push({ ...item, gain: sup.eff, sup, toMax, toLib, estimate: !!statFactor });
   }
-  out.sort((a, b) => b.gain - a.gain);
-  return { bonus, slotsUsed: (v.flatTalents || []).filter((t) => t?.isSuperTalent).length, list: out.concat(extra) };
+  out.sort((a, b) => b.sup.sample - a.sup.sample);
+  return { bonus, bookMax, slotsUsed: (v.flatTalents || []).filter((t) => t?.isSuperTalent).length, list: out.concat(extra) };
+};
+
+// Star talents that matter for this skill and are below their max level: what maxing them would do.
+export const starTalentCheck = (c, characters, account, skill, pi, loadout) => {
+  const v = loadout || c;
+  const base = skillMetrics(skill, v, c, characters, account, pi, false); if (!base.eff) return null;
+  const baseS = skillMetrics(skill, v, c, characters, account, pi, true, base);
+  const list = [];
+  for (const t of v.flatStarTalents || []) {
+    if (!t?.name || /^_|FILLER/.test(t.name) || !(t.maxLevel > 0) || !((t.level || 0) < t.maxLevel)) continue;
+    // Relevant if the talent does anything for this skill at all (0 against max), however little is left.
+    const txt = talentText(t);
+    const zero = setTalentLevel(v, t.skillIndex, 0);
+    const z = skillMetrics(skill, zero, c, characters, account, pi, false, null, { afk: AFK_RE.test(txt) ? null : base.afk });
+    const zS = skillMetrics(skill, zero, c, characters, account, pi, true, z, RES_RE.test(txt) ? {} : { noRes: true, snapPi: baseS.pi });
+    const full = compare(skill, v, c, characters, account, pi, z, zS, t.skillIndex, 0, t.maxLevel, null, null, t);
+    if (!meaningful(full, 1e-6)) continue;
+    const r = compare(skill, v, c, characters, account, pi, base, baseS, t.skillIndex, t.level || 0, t.maxLevel, null, null, t);
+    // Highest max level any of your characters has for this star talent.
+    const best = Math.max(...(characters || []).map((x) => (x.flatStarTalents || []).find((y) => y?.skillIndex === t.skillIndex)?.maxLevel ?? 0));
+    list.push({ skillIndex: t.skillIndex, name: t.name, level: t.level || 0, maxLevel: t.maxLevel, bestMax: best, description: t.description, ...r });
+  }
+  list.sort((a, b) => b.sampleS - a.sampleS);
+  return list;
+};
+
+// Right Hand of Action needs this character's skill level below the Voidwalker's. What it is worth if it did.
+export const rightHandCheck = (c, characters, account, skill, pi) => {
+  const vman = (characters || []).filter((x) => ['Maestro', 'Voidwalker'].includes(x?.class)).at(-1);
+  if (!vman) return { vman: null };
+  const myLv = c?.skillsInfo?.[skill]?.level ?? 0, vLv = vman?.skillsInfo?.[skill]?.level ?? 0;
+  if (vman.name === c.name) return { vman: vman.name, self: true, myLv, vLv };
+  const active = myLv < vLv;
+  let gain = null;
+  if (!active) {
+    try {
+      const v2 = { ...vman, skillsInfo: { ...vman.skillsInfo, [skill]: { ...(vman.skillsInfo?.[skill] || {}), level: myLv + 1 } } };
+      const chars = characters.map((x) => (x === vman ? v2 : x));
+      const a = getSkillEfficiency(skill, c, characters, account, pi)?.value, b = getSkillEfficiency(skill, c, chars, account, pi)?.value;
+      gain = ratio(b, a);
+    } catch (e) {}
+  }
+  return { vman: vman.name, self: false, myLv, vLv, active, gain };
 };
 
 // AFK gains for each skill, as if the character were AFK on that skill (the sample is 90% of AFK yield).
@@ -225,6 +335,10 @@ export const analyzeSave = (raw) => {
         return [s, plan && { ...plan, talentPreset: bt }];
       } catch (e) { return [s, null]; }
     }));
+    const stars = Object.fromEntries(planSkills.map((s) => {
+      try { const bt = presets[s]?.best?.talent ?? c.selectedTalentPreset ?? 0; return [s, starTalentCheck(c, characters, account, s, piForInputs, withLoadout(c, bt, c.selectedCardPreset ?? 0))]; } catch (e) { return [s, null]; }
+    }));
+    const hand = Object.fromEntries(SKILLS.map((s) => { try { return [s, rightHandCheck(c, characters, account, s, piForInputs)]; } catch (e) { return [s, null]; } }));
     const loadout = {
       equip: (c.equipment || []).map((x) => x?.rawName).filter((x) => x && x !== 'Blank'),
       tools: (c.tools || []).map((x) => x?.rawName).filter((x) => x && x !== 'Blank'),
@@ -238,7 +352,7 @@ export const analyzeSave = (raw) => {
     loadout.galleryChip = (() => { try { return getPlayerLabChipBonus(c, account, 16) ? 1 : 0; } catch (e) { return 0; } })();
     loadout.talentPreset = c.selectedTalentPreset ?? 0; loadout.cardPreset = c.selectedCardPreset ?? 0;
     const afk = afkTrees(c, characters, account);
-    return { afk, loadout, presets, supers, golden, name: c.name, cls: c.class, level: c.level, skillLv: Object.fromEntries(SKILLS.map((s) => [s, c.skillsInfo?.[s]?.level ?? 0])), trees, values, statueVal, inputs };
+    return { afk, loadout, presets, supers, stars, hand, golden, name: c.name, cls: c.class, level: c.level, skillLv: Object.fromEntries(SKILLS.map((s) => [s, c.skillsInfo?.[s]?.level ?? 0])), trees, values, statueVal, inputs };
   });
   const h = account?.hole?.holesObject || {};
   const extras = {};

@@ -26,6 +26,9 @@ button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-
 .tab[aria-selected="true"] .t1 { color: var(--accent); }
 
 .skillpanel { display: grid; gap: 20px; }
+.wrap > *, .skillpanel > *, .afk > *, .bis-wrap > *, .bis-boards > *, .setup > *, .field { min-width: 0; max-width: 100%; }
+.scroll { overflow-x: auto; max-width: 100%; }
+select { width: 100%; }
 .controls { display: flex; gap: 14px 22px; flex-wrap: wrap; align-items: end; }
 .field { display: grid; gap: 4px; }
 .field label { font-size: 0.78rem; color: var(--muted); font-weight: 500; }
@@ -128,6 +131,26 @@ table.slots td.miss { box-shadow: inset 0 0 0 2px #d14b3b; border-color: #d14b3b
 .supers .st.miss { box-shadow: inset 0 0 0 2px #d14b3b; }
 .supers .st .slot img { width: 36px; height: 36px; object-fit: contain; }
 .supers .gt { color: var(--muted); font-weight: 600; padding: 0 2px; }
+.checks { display: grid; gap: 8px; }
+.chk-row { display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: start; border: 1px solid var(--line); border-left: 4px solid var(--ahead); background: var(--surface); border-radius: 8px; padding: 10px 12px; }
+.chk-row.warn { border-left-color: var(--gap); background: var(--gap-soft); }
+.chk-row.soft { border-left-color: #d98a2b; }
+.chk-row .ico { width: 28px; height: 28px; object-fit: contain; }
+.chk-row strong { font-family: var(--font-display); }
+.chk-row .t { display: grid; gap: 3px; min-width: 0; font-size: 0.92rem; }
+.chk-row ul { margin: 2px 0 0; padding-left: 1.1em; display: grid; gap: 2px; }
+.chk-row .muted { color: var(--muted); font-size: 0.85rem; }
+.suptable td { vertical-align: middle; }
+.suptable td.tn { display: flex; align-items: center; gap: 8px; min-width: 220px; }
+.suptable .st { width: 40px; height: 40px; border-radius: 8px; background: var(--surface); display: inline-flex; flex: none; }
+.suptable .st.have { box-shadow: inset 0 0 0 2px #2f9e5a; }
+.suptable .st.miss { box-shadow: inset 0 0 0 2px #d14b3b; }
+.suptable .st .slot img { width: 30px; height: 30px; object-fit: contain; }
+.suptable td.num .sub { display: block; font-size: 0.75rem; color: var(--muted); }
+.suptable td.big { font-weight: 600; }
+.suptable .tag { font-size: 0.7rem; font-weight: 600; border-radius: 999px; padding: 0 6px; background: var(--sunk); color: var(--muted); white-space: nowrap; }
+.suptable .tag.snap { background: var(--accent-soft); color: var(--accent); }
+.suptable tr.dim td { opacity: 0.55; }
 .gal .minitable td, .gal .minitable th { white-space: nowrap; }
 .gal .minitable td:first-child { min-width: 220px; white-space: normal; }
 .gal .minitable th:not(:first-child), .gal .minitable td:not(:first-child) { text-align: center; padding-inline: 8px; }
@@ -272,6 +295,8 @@ const ICONS = /*__ICONS__*/;
   const charChoice = {};
   let showIgnored = false;
   let showAhead = true;
+  let includeSnap = false; // count talents that only matter through the HP / MP snapshot bubbles
+  try { includeSnap = localStorage.getItem('sgc:snapshot') === '1'; } catch (e) {}
   const openRows = new Set();
 
   try { const h = (location.hash || '').replace('#', ''); if (SKILL_ORDER.includes(h)) current = h; } catch (e) {}
@@ -292,7 +317,7 @@ const ICONS = /*__ICONS__*/;
   };
 
   // The save comes from the shared Account page (assets/site.js). The analysis takes ~10 s, so it is cached per save.
-  const CACHE_VERSION = 'v4-' + BENCH.createdAt;
+  const CACHE_VERSION = 'v5-' + BENCH.createdAt;
   let loadSeq = 0;
   const loadFromAccount = async () => {
     const T = window.IdleonTools;
@@ -854,26 +879,99 @@ const ICONS = /*__ICONS__*/;
     CHECK = null;
     return html;
   };
+  const SNAP_RES = { mining: 'HP', chopping: 'MP' };
   const talentTip = (t, sp, skill) => {
     const fmtLv = (v) => (typeof v === 'number' ? Math.round(v).toLocaleString('en-US') : '–');
     const val = typeof t.value === 'number' ? fmt(t.value) : '#';
     const lab = SK_ICON[skill].label.toLowerCase();
-    const lines = [`Level ${fmtLv(t.level)} (base ${fmtLv(t.baseLevel)})`];
-    if (t.gain) lines.push(t.supered ? `Its +${sp.bonus} super levels are worth ${t.estimate ? 'up to ' : ''}${fmtX(t.gain)} ${lab} efficiency` : `Supering it (+${sp.bonus} levels): ${t.estimate ? 'up to ' : ''}${fmtX(t.gain)} ${lab} efficiency`);
+    const lines = [`Level ${fmtLv(t.level)} (base ${fmtLv(t.baseLevel)}, max ${fmtLv(t.maxLevel)})`];
+    const s = t.sup;
+    if (s) {
+      const what = t.supered ? `Its +${sp.bonus} super levels are worth` : `Supering it (+${sp.bonus} levels):`;
+      const bits = [];
+      if ((s.eff || 1) > 1.00005) bits.push(`${t.estimate ? 'up to ' : ''}${fmtX(s.eff)} ${lab} efficiency`);
+      if (s.power) bits.push(`+${fmt(s.power)} ${lab} power`);
+      if ((s.afk || 1) > 1.00005) bits.push(`${fmtX(s.afk)} AFK gains`);
+      if (s.snap && (s.effS || 1) > (s.eff || 1) * 1.00005) bits.push(`${fmtX(s.effS)} efficiency with the ${SNAP_RES[skill] || 'HP / MP'} snapshot`);
+      lines.push(`${what} ${bits.join(', ') || 'almost nothing'}`);
+    }
     if (t.statNote) lines.push(t.statNote);
     lines.push(pretty(t.description || '').replace(/[{}]/g, val));
     return { title: pretty(t.name).toLowerCase().replace(/(^|\s)\S/g, (m) => m.toUpperCase()), type: t.supered ? 'Supered talent' : 'Not supered', lines };
   };
+  const tname = (n) => pretty(n).toLowerCase().replace(/(^|\s)\S/g, (m) => m.toUpperCase());
   const superHtml = (skill, char) => {
     const sp = char?.supers?.[skill];
     if (!sp) return `<article class="setup"><h3>Super talent priority</h3><p class="dnote">${char?.loadout ? 'Worked out for characters of this skill\'s class family and your best sampler. Pick one of those above.' : 'Import your save again to see this.'}</p></article>`;
+    if (!sp.list.some((t) => t.sup)) return superHtmlOld(skill, char, sp);
+    const lab = SK_ICON[skill].label.toLowerCase();
+    const res = SNAP_RES[skill];
     const icon = (t) => `<span class="st ${t.supered ? 'have' : 'miss'}">${slotBtn({ raw: 'UISkillIcon' + t.skillIndex, src: ICONS['UISkillIcon' + t.skillIndex], tip: talentTip(t, sp, skill) }, 'Talent')}</span>`;
-    const ranked = sp.list.filter((t) => t.gain), extra = sp.list.filter((t) => !t.gain);
+    const rows = sp.list.filter((t) => t.sup);
+    const hasSnap = rows.some((t) => t.sup.snap && (t.sup.effS || 1) > (t.sup.eff || 1) * 1.00005);
+    const effOf = (t) => (includeSnap ? t.sup.effS : t.sup.eff);
+    const sampleOf = (t) => (includeSnap ? t.sup.sampleS : t.sup.sample);
+    const shown = rows.filter((t) => includeSnap || (t.sup.eff || 1) > 1.0005 || (t.sup.afk || 1) > 1.0005 || Math.abs(t.sup.power || 0) > 0.05)
+      .sort((a, b) => sampleOf(b) - sampleOf(a));
+    const extra = sp.list.filter((t) => !t.sup);
     const statName = { mining: 'Strength', fishing: 'Strength', chopping: 'Wisdom', catching: 'Agility' }[skill];
+    const x = (v) => (typeof v === 'number' && v > 1.00005 ? fmtX(v) : '<span class="muted">–</span>');
+    const body = shown.map((t, i) => {
+      const s = t.sup, snapOnly = s.snap && (s.eff || 1) <= 1.0005 && (s.afk || 1) <= 1.0005;
+      return `<tr${t.supered ? '' : ''}><td class="num">${i + 1}</td>
+        <td class="tn">${icon(t)}<span>${esc(tname(t.name))}<br><span class="tag">${t.supered ? 'supered' : 'not supered'}</span>${s.snap && hasSnap ? ` <span class="tag snap">${res || 'HP / MP'} snapshot</span>` : ''}${t.estimate ? ' <span class="tag">estimate</span>' : ''}</span></td>
+        <td class="num">${x(effOf(t))}${includeSnap && s.snap && (s.effS || 1) > (s.eff || 1) * 1.00005 ? `<span class="sub">${x(s.eff)} without snapshot</span>` : ''}</td>
+        <td class="num">${s.power ? '+' + fmt(s.power) + `<span class="sub">${fmtX(s.powerX || 1)}</span>` : '<span class="muted">–</span>'}</td>
+        <td class="num">${x(s.afk)}</td>
+        <td class="num big">${x(sampleOf(t))}</td></tr>`;
+    }).join('');
     return `<article class="setup"><h3>Super talent priority <span class="src-ctx">talent preset ${(sp.talentPreset ?? 0) + 1}</span></h3>
-      ${ranked.length ? `<div class="supers">${ranked.map(icon).join('<span class="gt" aria-hidden="true">&gt;</span>')}</div>` : '<p class="dnote">None of this character\'s talents change this skill\'s efficiency.</p>'}
+      ${hasSnap ? `<label class="check" for="snapToggle"><input type="checkbox" id="snapToggle" ${includeSnap ? 'checked' : ''}> Count ${res || 'HP / MP'} snapshot talents (only if you sample with ${res === 'MP' ? 'a Mana' : 'an HP'} snapshot setup)</label>` : ''}
+      ${shown.length ? `<div class="scroll"><table class="minitable suptable"><thead><tr><th class="num">#</th><th>Talent</th><th class="num">Efficiency</th><th class="num">${esc(SK_ICON[skill].label)} power</th><th class="num">AFK gains</th><th class="num">Sample ≈</th></tr></thead><tbody>${body}</tbody></table></div>` : '<p class="dnote">None of this character\'s talents change this skill.</p>'}
       ${extra.length ? `<div class="supers"><span class="src-ctx" style="margin-right:6px">Also raise ${statName}:</span>${extra.map(icon).join('')}</div>` : ''}
-      <p class="dnote">Talents of ${esc(char.name)} that change ${esc(SK_ICON[skill].label.toLowerCase())} efficiency, best first, ranked by what +${sp.bonus} super talent levels do for them, on talent preset ${(sp.talentPreset ?? 0) + 1} (the better one for this skill). The "+% ${statName}" talent is an upper estimate. The second row raises ${statName} too (more ${statName}, bigger samples), but by how much depends on all your other ${statName} sources, which the save only has as a total, so those are not ranked. ${sp.slotsUsed} talents are supered on this preset in total.</p></article>`;
+      <p class="dnote">What +${sp.bonus} super talent levels do for ${esc(char.name)}'s ${esc(lab)} on talent preset ${(sp.talentPreset ?? 0) + 1} (the better one for this skill). For a supered talent (green) it is what its super levels are worth now. Power counts inside efficiency already. Sample ≈ AFK gains × efficiency<sup>0.35</sup>, because the sample is 90% of AFK yield and items per action grow with about efficiency<sup>0.35</sup>; the list is ranked by it. ${hasSnap ? `${res} snapshot talents raise max ${res}, which only counts through the ${res === 'MP' ? 'Hocus Choppus' : 'Hearty Diggy'} bubble when you sample with ${res === 'MP' ? 'a Mana' : 'an HP'} snapshot setup; tick the box to count them. ` : ''}The "+% ${statName}" talent is an upper estimate. The last row raises ${statName} too, but by how much depends on all your other ${statName} sources, which the save only has as a total, so those are not ranked. ${sp.slotsUsed} talents are supered on this preset in total.</p></article>`;
+  };
+  // Older saved analyses (before efficiency, power and AFK were compared) only have efficiency gains.
+  const superHtmlOld = (skill, char, sp) => {
+    const icon = (t) => `<span class="st ${t.supered ? 'have' : 'miss'}">${slotBtn({ raw: 'UISkillIcon' + t.skillIndex, src: ICONS['UISkillIcon' + t.skillIndex], tip: talentTip(t, sp, skill) }, 'Talent')}</span>`;
+    const ranked = sp.list.filter((t) => t.gain);
+    return `<article class="setup"><h3>Super talent priority</h3><div class="supers">${ranked.map(icon).join('<span class="gt" aria-hidden="true">&gt;</span>')}</div><p class="dnote">Open the Account page and import your save again to compare efficiency, power and AFK gains.</p></article>`;
+  };
+  // Checks shown right under the character picker: Right Hand of Action, star talents, talent levels / library.
+  const checksHtml = (skill, char) => {
+    const lab = SK_ICON[skill].label, low = lab.toLowerCase();
+    const row = (cls, icon, html) => `<div class="chk-row ${cls}">${icon ? `<img class="ico" src="${ICONS[icon] || ''}" alt="">` : '<span></span>'}<div class="t">${html}</div></div>`;
+    const out = [];
+    const h = char?.hand?.[skill];
+    if (h && h.vman && !h.self) {
+      if (!h.active) out.push(row('warn', 'UISkillIcon43', `<strong>Right Hand of Action is off for ${esc(char.name)}.</strong>
+        <span>Its ${low} level (${h.myLv}) is not below the Voidwalker ${esc(h.vman)}'s (${h.vLv}). The talent only works on characters with a lower ${low} level than the Voidwalker.${h.gain ? ` Turning it back on is worth <strong>${fmtX(h.gain)} ${low} efficiency</strong>.` : ''}</span>
+        <span class="muted">Level ${esc(h.vman)}'s ${low} above ${h.myLv}, or sample with a character below ${h.vLv}.</span>`));
+      else if (h.vLv - h.myLv <= 5) out.push(row('soft', 'UISkillIcon43', `<strong>Right Hand of Action: only ${h.vLv - h.myLv} ${h.vLv - h.myLv === 1 ? 'level' : 'levels'} left.</strong>
+        <span>${esc(char.name)} is ${low} level ${h.myLv}, the Voidwalker ${esc(h.vman)} is ${h.vLv}. Once ${esc(char.name)} reaches ${h.vLv}, the talent stops working for it. Keep ${esc(h.vman)}'s ${low} ahead.</span>`));
+      else out.push(row('', 'UISkillIcon43', `<strong>Right Hand of Action is on.</strong> <span class="muted">${esc(char.name)} ${low} ${h.myLv}, below the Voidwalker ${esc(h.vman)}'s ${h.vLv}.</span>`));
+    } else if (h && h.self) out.push(row('', 'UISkillIcon43', `<strong>This is the Voidwalker.</strong> <span class="muted">Right Hand of Action only counts on itself with Enhancement Eclipse.</span>`));
+    const stars = char?.stars?.[skill];
+    const sp = char?.supers?.[skill];
+    const pre = sp ? ` on talent preset ${(sp.talentPreset ?? 0) + 1}` : '';
+    if (Array.isArray(stars)) {
+      const real = stars.filter((s) => s.maxLevel <= 10000), open = stars.filter((s) => s.maxLevel > 10000);
+      const gainTxt = (s) => { const v = includeSnap ? s.effS : s.eff; const bits = []; if ((v || 1) > 1.00005) bits.push(fmtX(v) + ' efficiency'); if ((s.afk || 1) > 1.00005) bits.push(fmtX(s.afk) + ' AFK gains'); return bits.length ? 'maxing it: ' + bits.join(', ') : 'maxing it adds under 0.01%'; };
+      const li = (s) => `<li>${ic('UISkillIcon' + s.skillIndex)} <strong>${esc(tname(s.name))}</strong> ${fmt(s.level)} / ${fmt(s.maxLevel)} · ${s.maxLevel > 10000 ? gainTxt(s).replace('maxing it:', 'even fully maxed only') : gainTxt(s)}</li>`;
+      if (real.length) out.push(row('warn', 'UISkillIcon' + real[0].skillIndex, `<strong>${real.length} star ${real.length === 1 ? 'talent is' : 'talents are'} not maxed${pre}.</strong><span>They raise ${low}; put star talent points into them.</span><ul>${real.map(li).join('')}</ul>`));
+      else out.push(row('', null, `<strong>Every star talent that matters for ${low} is maxed${pre}.</strong>`));
+      if (open.length) out.push(row('soft', 'UISkillIcon' + open[0].skillIndex, `<strong>Open-ended star ${open.length === 1 ? 'talent' : 'talents'}.</strong><span>These have a cap you will not reach in practice; every point still helps a little.</span><ul>${open.map(li).join('')}</ul>`));
+    }
+    if (sp && sp.list.some((t) => t.sup)) {
+      const lib = sp.list.filter((t) => t.toLib), lv = sp.list.filter((t) => t.toMax);
+      const g = (r) => { const v = includeSnap ? r.effS : r.eff; const bits = []; if ((v || 1) > 1.00005) bits.push(fmtX(v) + ' efficiency'); if ((r.afk || 1) > 1.00005) bits.push(fmtX(r.afk) + ' AFK gains'); return bits.join(', ') || 'under 0.01%'; };
+      const items = [
+        ...lv.map((t) => `<li>${ic('UISkillIcon' + t.skillIndex)} <strong>${esc(tname(t.name))}</strong>: level ${fmt(t.toMax.from)} of ${fmt(t.toMax.to)}. Spend talent points to max it: ${g(t.toMax)}.</li>`),
+        ...lib.map((t) => `<li>${ic('UISkillIcon' + t.skillIndex)} <strong>${esc(tname(t.name))}</strong>: max level ${fmt(t.toLib.from)}, the Talent Book Library goes up to ${fmt(t.toLib.to)}. Read its book, then level it: ${g(t.toLib)}.</li>`)];
+      if (items.length) out.push(row('warn', 'UISkillIcon' + (lv[0] || lib[0]).skillIndex, `<strong>Talents that can still go higher${pre}.</strong><ul>${items.join('')}</ul>`));
+      else out.push(row('', null, `<strong>Every talent that matters for ${low} is at its max${sp.bookMax ? `, and the library's max (${fmt(sp.bookMax)}) is reached` : ''}.</strong> <span class="muted">Star talents can't be raised with library books.</span>`));
+    }
+    return out.length ? `<section class="checks" aria-label="Character checks">${out.join('')}</section>` : '';
   };
   const presetHtml = (skill, char) => {
     const p = char?.presets?.[skill]; if (!p || !p.best) return '';
@@ -1214,6 +1312,7 @@ const ICONS = /*__ICONS__*/;
         <div class="field"><label for="charSel">Your ${esc(meta.tab.toLowerCase())} character</label>
           <select id="charSel">${sortedChars.map((c) => `<option value="${esc(c.name)}" ${c.name === char.name ? 'selected' : ''}>${esc(c.name)} · ${esc(pretty(c.cls))} · lv ${c.skillLv[skill]}${mySample?.char === c.name ? ' · best sample' : ''}</option>`).join('')}</select></div>
       </div>
+      ${checksHtml(skill, char)}
       ${(CHECK_NAME_FOR_TIP = char.name, bisSection(skill, char))}
       <div class="controls">
         <label class="check" for="showAhead"><input type="checkbox" id="showAhead" ${showAhead ? 'checked' : ''}> Show sources where you are level or ahead</label>
@@ -1248,6 +1347,7 @@ const ICONS = /*__ICONS__*/;
       ${afkSection(skill, char)}`;
 
     $('charSel').addEventListener('change', (e) => { charChoice[skill] = e.target.value; openRows.clear(); render(); });
+    if ($('snapToggle')) $('snapToggle').addEventListener('change', (e) => { includeSnap = e.target.checked; try { localStorage.setItem('sgc:snapshot', includeSnap ? '1' : '0'); } catch (x) {} render(); });
     $('showAhead').addEventListener('change', (e) => { showAhead = e.target.checked; render(); });
     $('showIgn').addEventListener('change', (e) => { showIgnored = e.target.checked; render(); });
     $('expandAll').addEventListener('click', () => { panel.querySelectorAll('button[data-row]').forEach((b) => openRows.add(skill + b.dataset.row)); render(); });
