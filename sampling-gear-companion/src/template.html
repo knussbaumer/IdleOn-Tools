@@ -159,6 +159,10 @@ table.slots td.miss { box-shadow: inset 0 0 0 2px #d14b3b; border-color: #d14b3b
 .lvl.l3 { background: #e3eefb; color: #2c5d94; }
 .lvl.l2 { background: var(--sunk); color: var(--fg); }
 .lvl.inv, .lvl.low, .lvl.none { background: var(--gap-soft); color: var(--gap); }
+.gb { display: inline-block; font: 500 0.76rem/1.5 var(--font-mono); color: var(--muted); white-space: nowrap; margin-right: 6px; }
+.gb.afk { color: var(--accent); font-weight: 600; }
+.gbs { display: block; margin-top: 2px; }
+.gbs.gm { font: 500 0.74rem/1.4 var(--font-mono); color: var(--muted); }
 td.better { box-shadow: inset 0 -3px 0 #d98a2b; }
 img.ic { width: 22px; height: 22px; object-fit: contain; vertical-align: middle; margin-right: 6px; }
 img.ic.lg { width: 30px; height: 30px; }
@@ -317,7 +321,7 @@ const ICONS = /*__ICONS__*/;
   };
 
   // The save comes from the shared Account page (assets/site.js). The analysis takes ~10 s, so it is cached per save.
-  const CACHE_VERSION = 'v7-' + BENCH.createdAt;
+  const CACHE_VERSION = 'v8-' + BENCH.createdAt;
   let loadSeq = 0;
   const loadFromAccount = async () => {
     const T = window.IdleonTools;
@@ -1155,6 +1159,21 @@ const ICONS = /*__ICONS__*/;
   const isAfkItem = (x) => (x?.stats || []).some((s) => AFK_STAT_NAMES[s]);
   const PODIUM_MULTI = { 1: 1, 2: 1.5, 3: 2, 4: 2.5 };
   const NAMETAG_MULTI = [1, 1.6, 2, 2.3, 2.5];
+  // One gallery bonus: "+x%" for additive stats, "×y" for multipliers ("..._MULTI"), "+x STR" for flat stats.
+  const FLAT_STAT = { Weapon_Power: 'Weapon Power', STR: 'STR', AGI: 'AGI', WIS: 'WIS', LUK: 'LUK', Defence: 'Defence' };
+  const galBonus = ([stat, base], mult, noName) => {
+    const v = base * mult;
+    if (FLAT_STAT[stat]) return { txt: `+${fmt(v)}${noName ? '' : ' ' + FLAT_STAT[stat]}`, afk: false };
+    const name = AFK_STAT_NAMES[stat] || pretty(String(stat).replace(/^%_/, '')).toLowerCase().replace(/^\S/, (m) => m.toUpperCase());
+    const isMulti = /MULTI/.test(stat);
+    const label = noName ? '' : ' ' + (isMulti ? name.replace(/ multi$/i, '') : name);
+    return { txt: isMulti ? `×${fmt(1 + v / 100)}${label}` : `+${fmt(v)}${String(stat).startsWith('%') ? '%' : ''}${label}`, afk: !!AFK_STAT_NAMES[stat] };
+  };
+  const galMult = (m, gm) => `<span class="gbs gm" title="podium / copies ×${fmt(m / (gm || 1))} × gallery bonus multi ×${fmt(gm || 1)}">×${fmt(m)} multi</span>`;
+  const galBonusList = (raw, mult, onlyAfk, noName) => {
+    const list = (analysis.gallery?.items?.[raw] || []).map((s) => galBonus(s, mult, noName)).filter((b) => !onlyAfk || b.afk);
+    return list.map((b) => `<span class="gb${b.afk ? ' afk' : ''}">${esc(b.txt)}</span>`).join(' ');
+  };
   const itemName = (raw) => ICONS['n:' + raw] || pretty(raw);
   const statsOf = (raw) => String(ICONS['s:' + raw] || '').split(',').filter((s) => AFK_STAT_NAMES[s]).map((s) => AFK_STAT_NAMES[s]).join(', ');
   const galleryPanel = (skill, char) => {
@@ -1169,26 +1188,6 @@ const ICONS = /*__ICONS__*/;
       ${cmp(`${ic('HatHelpA')}Hats in the hat rack`, g.hats?.count ?? null, players.map((p) => p.g?.hats?.count ?? null))}
       ${cmp('<span class="src-ctx">Hat rack bonus multi</span>', g.hats?.multi ?? null, players.map((p) => p.g?.hats?.multi ?? null), (v) => v.toFixed(2) + '×')}
       </tbody></table></div>`;
-    // Trophies with an AFK stat: where each account has them.
-    const where = (gg, raw) => { const t = (gg.trophies || []).find((x) => x.raw === raw); if (t) return { lv: t.level, txt: `<span class="lvl l${t.level}">Lv ${t.level} ×${PODIUM_MULTI[t.level]}</span>` }; if ((gg.inventory || []).some((x) => (x.raw || x) === raw)) return { lv: 0.3, txt: '<span class="lvl inv">Inv ×0.3</span>' }; return null; };
-    const trophyRaws = [];
-    (g.trophies || []).concat(g.inventory || []).filter(isAfkItem).forEach((x) => trophyRaws.includes(x.raw) || trophyRaws.push(x.raw));
-    players.forEach((p) => (p.g?.trophies || []).forEach((x) => trophyRaws.includes(x.raw) || trophyRaws.push(x.raw)));
-    players.forEach((p) => (p.g?.inventory || []).forEach((x) => trophyRaws.includes(x) || trophyRaws.push(x)));
-    const trophyRows = trophyRaws.map((raw) => {
-      const m = where(g, raw);
-      return `<tr><td>${ic(raw)}${esc(itemName(raw))}<div class="src-ctx">${esc(statsOf(raw))}</div></td><td>${m ? m.txt : '<span class="lvl none">not placed</span>'}</td>${players.map((p) => { const w = p.g ? where(p.g, raw) : null; return `<td class="${w && (!m || w.lv > m.lv) ? 'better' : ''}">${w ? w.txt : '<span class="lvl">–</span>'}</td>`; }).join('')}</tr>`;
-    }).join('');
-    const myPodiums = [4, 3, 2, 1].map((lv) => { const list = (g.trophies || []).filter((x) => !x.empty && (x.level || 1) === lv); return list.length ? `<div style="margin:2px 0"><span class="src-ctx">Level ${lv}:</span> ${list.map((x) => `<span title="${esc(itemName(x.raw) + (isAfkItem(x) ? ' (AFK)' : ''))}" style="display:inline-block;${isAfkItem(x) ? 'box-shadow:inset 0 0 0 2px #2f9e5a;border-radius:5px;' : ''}">${ic(x.raw, true)}</span>`).join('')}</div>` : ''; }).join('');
-    // Nametags with an AFK stat: deposits (1 to 5 raise the bonus).
-    const ntRaws = [];
-    (g.nametags || []).filter(isAfkItem).forEach((x) => ntRaws.includes(x.raw) || ntRaws.push(x.raw));
-    players.forEach((p) => Object.keys(p.g?.nametags || {}).forEach((r) => ntRaws.includes(r) || ntRaws.push(r)));
-    const lvCell = (n) => (n == null ? '<span class="lvl none">missing</span>' : `<span class="lvl ${n >= 5 ? 'full' : 'low'}" title="${n} deposited">${Math.min(n, 5)}/5 ×${NAMETAG_MULTI[Math.min(n, 5) - 1]}</span>`);
-    const ntRows = ntRaws.map((raw) => {
-      const mine = (g.nametags || []).find((x) => x.raw === raw)?.level ?? null;
-      return `<tr><td>${ic(raw)}${esc(itemName(raw))}<div class="src-ctx">${esc(statsOf(raw))}</div></td><td>${lvCell(mine)}</td>${players.map((p) => { const n = p.g?.nametags?.[raw] ?? null; return `<td class="${n != null && Math.min(n, 5) > Math.min(mine ?? 0, 5) ? 'better' : ''}">${lvCell(n)}</td>`; }).join('')}</tr>`;
-    }).join('');
     // Gallery bonus multi: its own table, each source expandable.
     const GM = [
       ['level', 'GalleryBell', 'Gallery level', (v) => 3 * v, 'The gallery\'s own upgrade level in Spelunking: +3% per level. It also adds podiums (one per 4 levels).'],
@@ -1203,6 +1202,30 @@ const ICONS = /*__ICONS__*/;
     const myParts = { ...(g.multiParts || {}), chip: char?.loadout?.galleryChip ?? 0 };
     const pParts = players.map((p) => { const bp = BENCH.skills[skill].players.find((x) => x.player === p.name); return p.g?.multiParts ? { ...p.g.multiParts, chip: bp?.galleryChip ?? 0 } : null; });
     const gmTotal = (pp) => (pp ? 1 + GM.reduce((a, [k, , , f]) => a + f(pp[k] || 0), 0) / 100 : null);
+    // Trophies with an AFK stat: where each account has them.
+    const where = (gg, raw) => { const t = (gg.trophies || []).find((x) => x.raw === raw); if (t) return { lv: t.level, txt: `<span class="lvl l${t.level}">Lv ${t.level} ×${PODIUM_MULTI[t.level]}</span>` }; if ((gg.inventory || []).some((x) => (x.raw || x) === raw)) return { lv: 0.3, txt: '<span class="lvl inv">Inv ×0.3</span>' }; return null; };
+    const trophyRaws = [];
+    (g.trophies || []).concat(g.inventory || []).filter(isAfkItem).forEach((x) => trophyRaws.includes(x.raw) || trophyRaws.push(x.raw));
+    players.forEach((p) => (p.g?.trophies || []).forEach((x) => trophyRaws.includes(x.raw) || trophyRaws.push(x.raw)));
+    players.forEach((p) => (p.g?.inventory || []).forEach((x) => trophyRaws.includes(x) || trophyRaws.push(x)));
+    const myGM = gmTotal(myParts);
+    const trophyRows = trophyRaws.map((raw) => {
+      const m = where(g, raw);
+      const mine = m ? (m.lv === 0.3 ? 0.3 : PODIUM_MULTI[m.lv]) * myGM : null;
+      return `<tr><td>${ic(raw)}${esc(itemName(raw))}<span class="gbs"><span class="src-ctx">base </span>${galBonusList(raw, 1, true, false)}</span></td><td>${m ? m.txt : '<span class="lvl none">not placed</span>'}${m ? galMult(mine, myGM) + `<span class="gbs">${galBonusList(raw, mine, true, true)}</span>` : ''}</td>${players.map((p, i) => { const w = p.g ? where(p.g, raw) : null; const pm = w ? (w.lv === 0.3 ? 0.3 : PODIUM_MULTI[w.lv]) * (gmTotal(pParts[i]) || 1) : 0; return `<td class="${w && (!m || w.lv > m.lv) ? 'better' : ''}">${w ? w.txt + galMult(pm, gmTotal(pParts[i])) + `<span class="gbs">${galBonusList(raw, pm, true, true)}</span>` : '<span class="lvl">–</span>'}</td>`; }).join('')}</tr>`;
+    }).join('');
+    const myPodiums = [4, 3, 2, 1].map((lv) => { const list = (g.trophies || []).filter((x) => !x.empty && (x.level || 1) === lv); return list.length ? `<div style="margin:2px 0"><span class="src-ctx">Level ${lv}:</span> ${list.map((x) => `<span title="${esc(itemName(x.raw) + (isAfkItem(x) ? ' (AFK)' : ''))}" style="display:inline-block;${isAfkItem(x) ? 'box-shadow:inset 0 0 0 2px #2f9e5a;border-radius:5px;' : ''}">${ic(x.raw, true)}</span>`).join('')}</div>` : ''; }).join('');
+    // Nametags with an AFK stat: deposits (1 to 5 raise the bonus).
+    const ntRaws = [];
+    (g.nametags || []).filter(isAfkItem).forEach((x) => ntRaws.includes(x.raw) || ntRaws.push(x.raw));
+    players.forEach((p) => Object.keys(p.g?.nametags || {}).forEach((r) => ntRaws.includes(r) || ntRaws.push(r)));
+    const lvCell = (n) => (n == null ? '<span class="lvl none">missing</span>' : `<span class="lvl ${n >= 5 ? 'full' : 'low'}" title="${n} deposited">${Math.min(n, 5)}/5 ×${NAMETAG_MULTI[Math.min(n, 5) - 1]}</span>`);
+    const ntMult = (n, gm) => (n ? NAMETAG_MULTI[Math.min(n, 5) - 1] * (gm || 1) : 0);
+    const ntRows = ntRaws.map((raw) => {
+      const mine = (g.nametags || []).find((x) => x.raw === raw)?.level ?? null;
+      const mm = ntMult(mine, myGM);
+      return `<tr><td>${ic(raw)}${esc(itemName(raw))}<span class="gbs"><span class="src-ctx">base </span>${galBonusList(raw, 1, true, false)}</span></td><td>${lvCell(mine)}${mine ? galMult(mm, myGM) + `<span class="gbs">${galBonusList(raw, mm, true, true)}</span>` : ''}</td>${players.map((p, i) => { const n = p.g?.nametags?.[raw] ?? null; return `<td class="${n != null && Math.min(n, 5) > Math.min(mine ?? 0, 5) ? 'better' : ''}">${lvCell(n)}${n ? galMult(ntMult(n, gmTotal(pParts[i])), gmTotal(pParts[i])) + `<span class="gbs">${galBonusList(raw, ntMult(n, gmTotal(pParts[i])), true, true)}</span>` : ''}</td>`; }).join('')}</tr>`;
+    }).join('');
     const gmOpen = openRows.has(skill + 'galmulti');
     const gmRows = GM.map(([k, icon, label, f, how, lvl]) => {
       const mine = f(myParts[k] || 0); const theirs = pParts.map((pp) => (pp ? f(pp[k] || 0) : null));
@@ -1224,6 +1247,7 @@ const ICONS = /*__ICONS__*/;
       ${gmTable}
       <h3>Podiums and hat rack</h3>
       ${summary}
+      <p class="dnote">Each trophy and nametag shows its AFK bonus: the base value under its name, and in each column the total multi (podium level or copies deposited × that account's gallery bonus multi; hover it for the split) and the bonus that gives (yours: ${fmt(gmTotal({ ...(g.multiParts || {}), chip: char?.loadout?.galleryChip ?? 0 }))}×). <strong>+</strong> adds to a stat, <strong>×</strong> multiplies it. The AFK bonus is highlighted and also shown for each top account at their podium level and gallery multi. Items you have not placed show their base value.</p>
       <h3>Trophies with AFK gains</h3>${trophyRows ? `<div class="scroll"><table class="minitable"><thead><tr><th>Trophy</th><th class="num">You</th>${players.map((p) => `<th class="num">${esc(p.name)}</th>`).join('')}</tr></thead><tbody>${trophyRows}</tbody></table></div>` : ''}
       <div><span class="dnote">Your podiums (AFK trophies framed green):</span>${myPodiums}</div>
       <h3>Nametags with AFK gains</h3>${ntRows ? `<div class="scroll"><table class="minitable"><thead><tr><th>Nametag (copies deposited)</th><th class="num">You</th>${players.map((p) => `<th class="num">${esc(p.name)}</th>`).join('')}</tr></thead><tbody>${ntRows}</tbody></table></div>` : ''}

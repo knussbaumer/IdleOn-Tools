@@ -414,6 +414,18 @@ export const analyzeSave = (raw) => {
         killroyLevel: s(() => account?.accountOptions?.[467]), bubbleLevel: s(() => (account?.alchemy?.bubblesFlat || Object.values(account?.alchemy?.bubbles || {}).flat()).find((b) => b?.bubbleName === 'CODFREY_RULZ_OK')?.level) }; })(),
     };
   } catch (e) {}
+  // Base bonuses of every trophy and nametag (before podium / copies and the gallery bonus multi).
+  const galleryItems = {};
+  try {
+    for (const [raw, it] of Object.entries(ITEMS || {})) {
+      if (!/^(Trophy\d+|EquipmentNametag\d+)$/.test(raw)) continue;
+      const list = [];
+      for (const i of [1, 2]) { const txt = it?.['UQ' + i + 'txt'], val = Number(it?.['UQ' + i + 'val']) || 0; if (txt && txt !== '0' && val) list.push([txt, val]); }
+      for (const s of ['Weapon_Power', 'STR', 'AGI', 'WIS', 'LUK', 'Defence']) { const v = Number(it?.[s]) || 0; if (v) list.push([s, v]); }
+      galleryItems[raw] = list;
+    }
+  } catch (e) {}
+  if (gallery) gallery.items = galleryItems;
   return { gallery, trophies, chars, samples, extras, details, bisSave, lastUpdated: save.lastUpdated ?? null };
 };
 
