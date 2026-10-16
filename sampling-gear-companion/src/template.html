@@ -1166,8 +1166,10 @@ const ICONS = /*__ICONS__*/;
     if (FLAT_STAT[stat]) return { txt: `+${fmt(v)}${noName ? '' : ' ' + FLAT_STAT[stat]}`, afk: false };
     const name = AFK_STAT_NAMES[stat] || pretty(String(stat).replace(/^%_/, '')).toLowerCase().replace(/^\S/, (m) => m.toUpperCase());
     const isMulti = /MULTI/.test(stat);
-    const label = noName ? '' : ' ' + (isMulti ? name.replace(/ multi$/i, '') : name);
-    return { txt: isMulti ? `×${fmt(1 + v / 100)}${label}` : `+${fmt(v)}${String(stat).startsWith('%') ? '%' : ''}${label}`, afk: !!AFK_STAT_NAMES[stat] };
+    // "..._MULTI" stats from every trophy, nametag, hat and piece of gear are added up into one multiplier
+    // (AFK gains multi = 1 + their sum ÷ 100), so a single item adds +x% to it rather than multiplying.
+    const label = noName ? '' : ' ' + (isMulti ? 'to the ' + name : name);
+    return { txt: `+${fmt(v)}${String(stat).startsWith('%') ? '%' : ''}${label}`, afk: !!AFK_STAT_NAMES[stat] };
   };
   const galMult = (m, gm) => `<span class="gbs gm" title="podium / copies ×${fmt(m / (gm || 1))} × gallery bonus multi ×${fmt(gm || 1)}">×${fmt(m)} multi</span>`;
   const galBonusList = (raw, mult, onlyAfk, noName) => {
@@ -1258,18 +1260,21 @@ const ICONS = /*__ICONS__*/;
     const a = compareAfk(skill, char);
     if (!a) return '<section class="afk"><h2>AFK gains</h2><p class="lede">Import your save again to see the AFK gains comparison.</p></section>';
     const bestTop = a.players.reduce((x, p) => (p.afk > (x?.afk || 0) ? p : x), null);
-    const isMultiRow = (r) => r.stat === '%_AFK_GAINS_MULTI' || (!r.part && (r.unit === 'multiplier' || /multi|Tesseract/i.test(r.name)));
+    const isMultiRow = (r) => !r.part && (r.unit === 'multiplier' || /multi|Tesseract/i.test(r.name));
+    const isMultiPart = (r) => r.stat === '%_AFK_GAINS_MULTI';
+    const multiSum = a.rows.filter(isMultiPart).reduce((s, r) => s + (r.value || 0), 0);
+    const secOf = (r) => (isMultiPart(r) ? 'mparts' : isMultiRow(r) ? 'multi' : 'pct');
     const unitOf = (r) => (r.part ? '%' : r.unit === 'multiplier' || /multi|Tesseract/i.test(r.name) ? '×' : '%');
     const rowsSorted = a.rows.filter((r) => showIgnored || !r.ignored).filter((r) => showAhead || r.ignored || (r.best && r.best.gain > 1.0005)).sort((x, y) => (y.best?.gain || 0) - (x.best?.gain || 0));
     const maxLog = Math.max(...a.rows.filter((r) => !r.ignored && r.best).map((r) => Math.log(r.best.gain)), 0.01);
     const PART_DESC = { trophies: 'Trophies placed on gallery podiums. Higher podium levels multiply the bonus. Account-wide.', nametags: 'Nametags placed in the gallery. Account-wide.', hatRack: 'Premium hats in the hat rack. Account-wide.', equipment: 'Gear worn by this character (ignored in the ranking: it changes with the loadout).' };
     const desc = (r) => { if (r.part) return PART_DESC[r.part]; const d = AFK_DESC[r.name]; return typeof d === 'object' ? d[skill] : d; };
     const row = (r) => {
-      const key = 'afk' + r.path; const isOpen = openRows.has(skill + key); const u = unitOf(r);
+      const key = 'afk' + r.path; const isOpen = openRows.has(skill + key); const u = unitOf(r); const pre = isMultiPart(r) ? '+' : '';
       const g = r.best ? r.best.gain : NaN; const width = r.best && g > 1 ? Math.max(3, Math.round(100 * Math.log(g) / maxLog)) : 0;
       const st = r.ignored ? '<span class="pill ign">ignored · loadout</span>' : !r.best ? '<span class="pill even">no data</span>' : g > 1.005 ? '<span class="pill gap">gap</span>' : g < 0.9999 || r.theirs.every((t) => typeof t.value !== 'number' || t.value <= r.value + 1e-9) ? '<span class="pill ahead">at or above top</span>' : '<span class="pill even">level</span>';
-      let out = `<tr class="${r.ignored ? 'row-ign' : g > 1.005 ? '' : 'row-ahead'}"><td><button type="button" class="link" data-row="${esc(key)}" data-afk="1" aria-expanded="${isOpen}"><span class="chev" aria-hidden="true">${isOpen ? '▾' : '▸'}</span><span class="src-name">${afkIcons(r, skill).map((x) => ic(x)).join('')}${esc(r.name)}</span></button><div class="src-ctx">${esc((r.ctx || []).join(' › ') || (r.part ? (r.stat === '%_AFK_GAINS_MULTI' ? 'AFK gains multiplier' : 'AFK gains') : u === '×' ? 'AFK gains multiplier' : 'AFK gains'))}${r.part && r.part !== 'equipment' ? ' · account-wide' : ''}</div></td>
-        <td class="num">${fmt(r.value)}${u}</td><td class="num">${fmt(r.med)}${u}</td><td class="num">${r.best ? fmt(r.best.value) + u + `<div class="who">${esc(r.best.player)}</div>` : '–'}</td>
+      let out = `<tr class="${r.ignored ? 'row-ign' : g > 1.005 ? '' : 'row-ahead'}"><td><button type="button" class="link" data-row="${esc(key)}" data-afk="1" aria-expanded="${isOpen}"><span class="chev" aria-hidden="true">${isOpen ? '▾' : '▸'}</span><span class="src-name">${afkIcons(r, skill).map((x) => ic(x)).join('')}${esc(r.name)}</span></button><div class="src-ctx">${esc((r.ctx || []).join(' › ') || (r.part ? (r.stat === '%_AFK_GAINS_MULTI' ? 'adds to the AFK gains multi' : 'AFK gains') : u === '×' ? 'AFK gains multiplier' : 'AFK gains'))}${r.part && r.part !== 'equipment' ? ' · account-wide' : ''}</div></td>
+        <td class="num">${pre}${fmt(r.value)}${u}</td><td class="num">${r.med == null || Number.isNaN(r.med) ? '–' : pre + fmt(r.med) + u}</td><td class="num">${r.best ? pre + fmt(r.best.value) + u + `<div class="who">${esc(r.best.player)}</div>` : '–'}</td>
         <td class="num"><div class="gain"><div class="bar" aria-hidden="true"><i style="width:${width}%"></i></div><span>${r.best ? fmtX(g) : '–'}</span></div></td><td>${st}</td></tr>`;
       if (isOpen) out += `<tr class="detail"><td colspan="6"><div class="dwrap"><div class="dsec"><h3>${afkIcons(r, skill).map((x) => ic(x, true)).join('')}${esc(r.name)}</h3>${desc(r) ? `<p class="dnote">${esc(desc(r))}</p>` : ''}${galleryDetail(r)}</div><div class="dsec"><div class="scroll"><table class="minitable"><thead><tr><th>Player</th><th>Character</th><th class="num">Value</th><th class="num">Your AFK gains if matched</th></tr></thead><tbody>
         <tr class="you"><td>You</td><td>${esc(char.name)}</td><td class="num">${fmt(r.value)}${u}</td><td class="num">1×</td></tr>
@@ -1286,7 +1291,7 @@ const ICONS = /*__ICONS__*/;
       </div>
       ${galleryPanel(skill, char)}
       <div class="sources"><div class="scroll"><table><thead><tr><th>AFK gains source</th><th class="num">You</th><th class="num">Top-5 median</th><th class="num">Best</th><th class="num">Gain if matched</th><th>Status</th></tr></thead>
-      <tbody>${[['multi', 'Multipliers (×)', 'each one multiplies your whole AFK gains'], ['pct', 'AFK gains (%)', 'these add up, then the total is multiplied by the multipliers']].map(([id, title, note]) => { const body = rowsSorted.filter((r) => (isMultiRow(r) ? 'multi' : 'pct') === id).map(row).join(''); return body ? `<tr class="section"><td colspan="6">${esc(title)} <span class="src-ctx">${esc(note)}</span></td></tr>` + body : ''; }).join('')}</tbody></table></div></div></section>`;
+      <tbody>${[['mparts', `AFK gains multi (×${fmt(1 + multiSum / 100)})`, `one multiplier: 1 + (trophies + nametags + hat rack + gear) ÷ 100 = 1 + ${fmt(multiSum)}% ÷ 100. Each row below adds its % to it.`], ['multi', 'Other multipliers (×)', 'each one multiplies your whole AFK gains'], ['pct', 'AFK gains (%)', 'these add up, then the total is multiplied by the multipliers']].map(([id, title, note]) => { const body = rowsSorted.filter((r) => secOf(r) === id).map(row).join(''); return body ? `<tr class="section"><td colspan="6">${esc(title)} <span class="src-ctx">${esc(note)}</span></td></tr>` + body : ''; }).join('')}</tbody></table></div></div></section>`;
   };
 
   // Render ------------------------------------------------------------------
