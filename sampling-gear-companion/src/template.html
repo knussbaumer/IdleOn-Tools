@@ -955,10 +955,18 @@ const ICONS = /*__ICONS__*/;
     const sp = char?.supers?.[skill];
     const pre = sp ? ` on talent preset ${(sp.talentPreset ?? 0) + 1}` : '';
     if (Array.isArray(stars)) {
-      const gainOf = (r) => { const v = includeSnap ? r.effS : r.eff; const bits = []; if ((v || 1) > 1.00005) bits.push(fmtX(v) + ' efficiency'); if ((r.afk || 1) > 1.00005) bits.push(fmtX(r.afk) + ' AFK gains'); return bits.length ? bits.join(', ') : 'under 0.01%'; };
+      const resName = { mining: 'HP', chopping: 'MP' }[skill];
+      const gainOf = (r) => {
+        const bits = [];
+        if ((r.eff || 1) > 1.00005) bits.push(fmtX(r.eff) + ' efficiency');
+        if (resName && (r.effS || 1) > (r.eff || 1) * 1.00005) bits.push(fmtX(r.effS) + ' efficiency with the ' + resName + ' snapshot');
+        if ((r.afk || 1) > 1.00005) bits.push(fmtX(r.afk) + ' AFK gains');
+        return bits.length ? bits.join(', ') : 'under 0.01%';
+      };
+      const snapTag = (s) => (resName && (s.name === 'UBERCHARGED_HEALTH' || (s.toLib?.effS || 1) > (s.toLib?.eff || 1) * 1.00005 || (s.effS || 1) > (s.eff || 1) * 1.00005) ? ` <span class="pill even">${resName} snapshot</span>` : '');
       const notMax = stars.filter((s) => s.notMaxed && s.maxLevel <= 10000), open = stars.filter((s) => s.notMaxed && s.maxLevel > 10000), vipUp = stars.filter((s) => s.toLib);
-      const li = (s) => `<li>${ic('UISkillIcon' + s.skillIndex)} <strong>${esc(tname(s.name))}</strong> ${fmt(s.level)} / ${fmt(s.maxLevel)} · ${s.maxLevel > 10000 ? 'even fully maxed: ' : 'maxing it: '}${gainOf(s)}</li>`;
-      const vli = (s) => `<li>${ic('UISkillIcon' + s.skillIndex)} <strong>${esc(tname(s.name))}</strong>: max level ${fmt(s.toLib.from)}, a VIP book can take it to ${fmt(s.toLib.to)} (VIP Bookshelf, needs ${fmt(s.vip)}% VIP Membership). Read it, then level it: ${gainOf(s.toLib)}.</li>`;
+      const li = (s) => `<li>${ic('UISkillIcon' + s.skillIndex)} <strong>${esc(tname(s.name))}</strong>${snapTag(s)} ${fmt(s.level)} / ${fmt(s.maxLevel)} · ${s.maxLevel > 10000 ? 'even fully maxed: ' : 'maxing it: '}${gainOf(s)}</li>`;
+      const vli = (s) => `<li>${ic('UISkillIcon' + s.skillIndex)} <strong>${esc(tname(s.name))}</strong>${snapTag(s)}: max level ${fmt(s.toLib.from)}, a VIP book can take it to ${fmt(s.toLib.to)} (VIP Bookshelf, needs ${fmt(s.vip)}% VIP Membership). Read it, then level it: ${gainOf(s.toLib)}.</li>`;
       if (notMax.length) out.push(row('warn', 'UISkillIcon' + notMax[0].skillIndex, `<strong>${notMax.length} star ${notMax.length === 1 ? 'talent is' : 'talents are'} not maxed${pre}.</strong><span>They raise ${low}; put star talent points into them.</span><ul>${notMax.map(li).join('')}</ul>`));
       else out.push(row('', null, `<strong>Every star talent that matters for ${low} is maxed${pre}.</strong>`));
       if (vipUp.length) out.push(row('warn', 'UISkillIcon' + vipUp[0].skillIndex, `<strong>Star talents the library can still raise.</strong><span>Seven star talents have books on the library's VIP Bookshelf.</span><ul>${vipUp.map(vli).join('')}</ul>`));

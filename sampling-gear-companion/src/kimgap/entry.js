@@ -130,7 +130,8 @@ const SNAP_SKILL = { mining: 'maxHp', chopping: 'maxMp' };
 // the slower AFK and snapshot runs; everything else keeps the base value for them.
 const talentText = (t) => `${t?.name || ''} ${t?.description || ''} ${t?.lvlUpText || ''}`;
 const AFK_RE = /AFK/i;
-const RES_RE = /\bHP\b|\bMP\b|MANA|HEALTH|STR\b|STRENGTH|WIS\b|WISDOM|ALL_STAT|ALL_STATS|STAT/i;
+// Names and texts use underscores ("+{_Base_HP"), so match HP / MP / STR / WIS between non-letters.
+const RES_RE = /(?:^|[^A-Z])(?:HP|MP|STR|WIS)(?:[^A-Z]|$)|MANA|HEALTH|STRENGTH|WISDOM|STAT/i;
 const skillMetrics = (skill, ch, orig, characters, account, pi, snapshot, plain, opts = {}) => {
   const chars = ch === orig ? characters : characters.map((x) => (x === orig ? ch : x));
   if (snapshot) {
@@ -247,7 +248,8 @@ export const starTalentCheck = (c, characters, account, skill, pi, loadout) => {
     const zS = skillMetrics(skill, zero, c, characters, account, pi, true, z, RES_RE.test(txt) ? {} : { noRes: true, snapPi: baseS.pi });
     const top = libUp ? bookMax : t.maxLevel;
     const full = compare(skill, v, c, characters, account, pi, z, zS, t.skillIndex, 0, top, null, null, t);
-    if (!meaningful(full, 1e-6)) continue;
+    // Ubercharged Health raises base HP, which only counts through the HP snapshot (Hearty Diggy); always check it for mining.
+    if (!meaningful(full, 1e-6) && !(skill === 'mining' && t.name === 'UBERCHARGED_HEALTH')) continue;
     const r = (t.level || 0) < t.maxLevel ? compare(skill, v, c, characters, account, pi, base, baseS, t.skillIndex, t.level || 0, t.maxLevel, null, null, t) : { eff: 1, afk: 1, effS: 1, power: 0, sample: 1, sampleS: 1 };
     const toLib = libUp ? { from: t.maxLevel, to: bookMax, ...compare(skill, v, c, characters, account, pi, base, baseS, t.skillIndex, t.level || 0, bookMax, null, null, t) } : null;
     // Highest max level any of your characters has for this star talent.
