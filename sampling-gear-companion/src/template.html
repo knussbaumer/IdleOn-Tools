@@ -201,7 +201,7 @@ details.more > summary { cursor: pointer; color: var(--accent); font-weight: 500
     <p><strong>Gain ×</strong> is your total efficiency with that single source raised to the best top sampler's value, divided by your efficiency today. Sources that sit in the same additive group share one multiplier, so their gains do not simply multiply together.</p>
     <p><strong>Efficiency is not yield.</strong> In the game's fishing formula, items per action grow with efficiency to the power of about 0.35 once prowess is capped at 0.1, so 10× efficiency gives about 2.2× items. Mining, chopping and catching very likely work the same way, but that is not verified.</p>
     <p><strong>Top samplers</strong> are the characters holding each account's best Copper, Oak Log, Fly and Goldfish sample, read from their public IdleonToolbox profiles on <span id="benchDate"></span>. Their character-specific values (talent levels, skill level, stats, star sign, prayers) are from their current loadout, which may not be the one they sampled with.</p>
-    <p>Calculations are IdleonToolbox's own parser, bundled into this page (GPL-3.0, github.com/Morta1/IdleonToolbox). Your save is processed in your browser and is not uploaded anywhere.</p>
+    <p>Calculations use IdleonToolbox's own parser, bundled into this page (GPL-3.0, github.com/Morta1/IdleonToolbox). Your save is processed in your browser and is not uploaded anywhere.</p>
   </section>
 </div>
 
@@ -308,7 +308,7 @@ const ICONS = /*__ICONS__*/;
   const setStatus = (html) => { $('importStatus').innerHTML = html; };
   const describeSource = () => {
     if (!analysis) return '<span class="err">No save loaded yet.</span> Import your save on the <a href="../account/">Account page</a> and it shows up here.';
-    const when = analysis.lastUpdated ? new Date(analysis.lastUpdated).toLocaleString('de-CH', { dateStyle: 'medium', timeStyle: 'short' }) : 'unknown time';
+    const when = analysis.lastUpdated ? new Date(analysis.lastUpdated).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : 'unknown time';
     return `<span class="eyebrow">Showing</span><br><strong>${esc(source)}</strong> · save from ${esc(when)} · ${analysis.chars.length} characters`;
   };
 
@@ -449,7 +449,7 @@ const ICONS = /*__ICONS__*/;
   const ctxLabel = (ctx, skill) => {
     const names = ctx.filter(Boolean);
     if (!names.length) return 'Efficiency multiplier';
-    return names.join(' › ');
+    return names.join(' › ').replace(/\bchoppin\b/g, 'chopping').replace(/\bChoppin\b/g, 'Chopping');
   };
 
   const sectionOf = (r) => {
@@ -543,7 +543,7 @@ const ICONS = /*__ICONS__*/;
       </tbody></table></div>`;
   };
 
-  const VIAL_STAT_LABEL = { '6SkillEff': 'all skill efficiency', MinEff: 'mining efficiency', ChopEff: 'choppin efficiency', CatchEff: 'catching efficiency', FishEff: 'fishing efficiency' };
+  const VIAL_STAT_LABEL = { '6SkillEff': 'all skill efficiency', MinEff: 'mining efficiency', ChopEff: 'chopping efficiency', CatchEff: 'catching efficiency', FishEff: 'fishing efficiency' };
   const vialDetail = (skill) => {
     const me = myDetails(skill)?.vials; if (!me) return needReimport;
     const bp = benchPlayers(skill);
@@ -611,7 +611,7 @@ const ICONS = /*__ICONS__*/;
   const ic = (raw, lg) => (raw && ICONS[raw] ? `<img class="ic${lg ? ' lg' : ''}" src="${ICONS[raw]}" alt="">` : '');
   const SK_ICON = {
     mining: { stamps: ['StampB1', 'StampB10'], statue: 'StatueZ3', golden: 'PeanutG', box: 'UIboxUpg4', vial: 'Void', label: 'Mining' },
-    chopping: { stamps: ['StampB2', 'StampB12'], statue: 'StatueZ7', box: 'UIboxUpg6', vial: 'SaharanFoal', label: 'Choppin' },
+    chopping: { stamps: ['StampB2', 'StampB12'], statue: 'StatueZ7', box: 'UIboxUpg6', vial: 'SaharanFoal', label: 'Chopping' },
     catching: { stamps: ['StampB19'], statue: 'StatueZ10', box: 'UIboxUpg10', vial: 'Bug5', label: 'Catching' },
     fishing: { stamps: ['StampB17'], statue: 'StatueZ9', golden: 'FoodG7', box: 'UIboxUpg8', vial: 'SnowB2', label: 'Fishing' },
   };
@@ -671,7 +671,7 @@ const ICONS = /*__ICONS__*/;
     if (r.key === 'Vial') return `Vial (${lab.toLowerCase()} vial)`;
     if (r.key === 'Skill mastery') return `Skill mastery (${lab.toLowerCase()} rank)`;
     if (r.key === 'Post office') return `Post office (${pretty({ mining: 'Dwarven_Supplies', chopping: 'Taped_Up_Timber', catching: 'Bug_Hunting_Supplies', fishing: 'Sealed_Fishheads' }[skill])})`;
-    return DISPLAY[r.key] || r.name;
+    return String(DISPLAY[r.key] || r.name).replace(/\bChoppin\b/g, 'Chopping').replace(/\bchoppin\b/g, 'chopping');
   };
 
   // What each source is and what feeds it, from IdleonToolbox's efficiency formulas.
@@ -709,9 +709,9 @@ const ICONS = /*__ICONS__*/;
     'Meal@alleff': 'Skill efficiency meals. See the meal breakdown.',
     'Ancient Multitool talent@alleff': 'Star talent; an additive % in the large meal group, so it is small next to the meal bonus.',
     'Tome@alleff': 'The Tome skill efficiency bonus, from your total tome points.',
-    'Palette@alleff': 'The Pair Green colour in the Gaming palette.',
+    'Palette@alleff': 'The Pair Green color in the Gaming palette.',
     'Friend@alleff': 'Friend bonus to skill efficiency, from your friends list.',
-    'Skill mastery@alleff': 'Rift skill mastery (needs Rift 15): +5% for every eligible skill at family rank 5 or higher. Mining, choppin, fishing, catching, trapping and worship do not count here; the 14 other skills do. A skill\'s family rank comes from the account\'s total level in that skill. This is a different bonus from the skill\'s own mastery row.',
+    'Skill mastery@alleff': 'Rift skill mastery (needs Rift 15): +5% for every eligible skill at family rank 5 or higher. Mining, chopping, fishing, catching, trapping and worship do not count here; the 14 other skills do. A skill\'s family rank comes from the account\'s total level in that skill. This is a different bonus from the skill\'s own mastery row.',
     'Skill mastery': 'Rift skill mastery for this skill (needs Rift 15): +10% once this skill\'s family rank is 2 or higher. The rank comes from the account\'s total level in this skill, summed over all characters. The second mastery row (all skills) is a separate bonus.',
     'Schematic@alleff': 'Caverns engineer schematic: 15% per Motherlode layer, plus 15% per Hive layer, Evertree layer and Bottomless Trench depth once each of their follow-up schematics is bought.',
     'Account bonus@alleff': 'The fourth upgrade in the Hoops minigame shop: +1% efficiency for all skills per level. Each level costs 5 + 20 × its level in Hoops points.',
@@ -834,7 +834,7 @@ const ICONS = /*__ICONS__*/;
   const BIS_NOTES = {
     'Mining': 'Mining sampler setup.',
     'HP Snapshot': 'Worn while you enter the map before the sample is taken, so Max HP is as high as possible for the Hearty Diggy bubble. Switch to the Mining setup above afterwards.',
-    'Chopping': 'Choppin sampler setup.',
+    'Chopping': 'Chopping sampler setup.',
     'Mana Snapshot': 'Worn while you enter the map before the sample is taken, so Max Mana is as high as possible for the Hocus Choppus bubble. Switch to the Chopping setup above afterwards.',
     'Catching': 'Catching sampler setup.',
     'Fishing': 'Fishing sampler setup. Pick bait, line and ring per fishing spot from the table below.',
@@ -934,7 +934,7 @@ const ICONS = /*__ICONS__*/;
       ${hasSnap ? `<label class="check" for="snapToggle"><input type="checkbox" id="snapToggle" ${includeSnap ? 'checked' : ''}> Count ${res || 'HP / MP'} snapshot talents (only if you sample with ${res === 'MP' ? 'a Mana' : 'an HP'} snapshot setup)</label>` : ''}
       ${shown.length ? `<div class="scroll"><table class="minitable suptable"><thead><tr><th class="num">#</th><th>Talent</th><th class="num">Efficiency</th><th class="num">${esc(SK_ICON[skill].label)} power</th><th class="num">AFK gains</th><th class="num">Sample ≈</th></tr></thead><tbody>${body}</tbody></table></div>` : '<p class="dnote">None of this character\'s talents change this skill.</p>'}
       ${extra.length ? `<div class="supers"><span class="src-ctx" style="margin-right:6px">Also raise ${statName}:</span>${extra.map(icon).join('')}</div>` : ''}
-      <p class="dnote">What +${sp.bonus} super talent levels do for ${esc(char.name)}'s ${esc(lab)} on talent preset ${(sp.talentPreset ?? 0) + 1} (the better one for this skill). For a supered talent (green) it is what its super levels are worth now. Power counts inside efficiency already. Sample ≈ AFK gains × efficiency<sup>0.35</sup>, because the sample is 90% of AFK yield and items per action grow with about efficiency<sup>0.35</sup>; the list is ranked by it. ${hasSnap ? `${res} snapshot talents raise max ${res}, which only counts through the ${res === 'MP' ? 'Hocus Choppus' : 'Hearty Diggy'} bubble when you sample with ${res === 'MP' ? 'a Mana' : 'an HP'} snapshot setup; tick the box to count them. ` : ''}The "+% ${statName}" talent is an upper estimate. The last row raises ${statName} too, but by how much depends on all your other ${statName} sources, which the save only has as a total, so those are not ranked. ${sp.slotsUsed} talents are supered on this preset in total.</p></article>`;
+      <p class="dnote">What +${sp.bonus} super talent levels do for ${esc(char.name)}'s ${esc(lab)} on talent preset ${(sp.talentPreset ?? 0) + 1} (the better one for this skill). For a supered talent (green) it is what its super levels are worth now. Power counts inside efficiency already. Sample ≈ AFK gains × efficiency<sup>0.35</sup>, because the sample is a fixed share of AFK yield and items per action grow with about efficiency<sup>0.35</sup>; the list is ranked by it. ${hasSnap ? `${res} snapshot talents raise max ${res}, which only counts through the ${res === 'MP' ? 'Hocus Choppus' : 'Hearty Diggy'} bubble when you sample with ${res === 'MP' ? 'a Mana' : 'an HP'} snapshot setup; tick the box to count them. ` : ''}The "+% ${statName}" talent is an upper estimate. The last row raises ${statName} too, but by how much depends on all your other ${statName} sources, which the save only has as a total, so those are not ranked. ${sp.slotsUsed} talents are supered on this preset in total.</p></article>`;
   };
   // Older saved analyses (before efficiency, power and AFK were compared) only have efficiency gains.
   const superHtmlOld = (skill, char, sp) => {
@@ -1021,7 +1021,7 @@ const ICONS = /*__ICONS__*/;
       <div class="bis-head"><h2>Best in slot</h2><span class="dnote">Hover or tap an item for its description and stats.</span></div>
       <div class="checks-key"><span><i style="box-shadow:inset 0 0 0 2px #2f9e5a"></i>supered / equipped on ${esc(char?.name || 'this character')}</span><span><i style="box-shadow:inset 0 0 0 2px #d14b3b"></i>not supered / not equipped</span><span>Trophies are checked against your gallery. The snapshot setups are not checked.</span></div>
       <div class="bis-boards">${presetHtml(skill, char)}${superHtml(skill, char)}${boards.map((b) => bisBoard(b, char)).join('')}${skill === 'fishing' ? spotsHtml() : ''}</div>
-      <p class="credit">Taken and updated from AlmostPsycho's Sampling Sheet, Thank you.</p>
+      <p class="credit">Taken and updated from AlmostPsycho's Sampling Sheet. Thank you!</p>
     </section>`;
   };
   const tipEl = document.createElement('div'); tipEl.className = 'bis-tip'; tipEl.hidden = true; tipEl.setAttribute('role', 'tooltip'); document.body.appendChild(tipEl);
@@ -1299,7 +1299,7 @@ const ICONS = /*__ICONS__*/;
       return out;
     };
     return `<section class="afk" style="display:grid;gap:14px"><h2>AFK gains</h2>
-      <p class="dnote">The sample is 90% of what the character makes per hour AFK, and that scales one to one with the AFK gains rate. So a gain here grows the sample by the same factor, while an efficiency gain only counts at about the power 0.35. Values are for this character as if it were AFK on ${esc(SK_ICON[skill].label.toLowerCase())}.</p>
+      <p class="dnote">The sample is a share (up to 90%) of what the character makes per hour AFK, and that scales one to one with the AFK gains rate. So a gain here grows the sample by the same factor, while an efficiency gain only counts at about the power 0.35. Values are for this character as if it were AFK on ${esc(SK_ICON[skill].label.toLowerCase())}.</p>
       <div class="headline">
         <div class="stat"><span class="eyebrow">Your AFK gains</span><span class="v">${fmt(a.base)}%</span><span class="s">${esc(char.name)}</span></div>
         <div class="stat"><span class="eyebrow">Best top sampler</span><span class="v">${bestTop ? fmt(bestTop.afk) + '%' : '–'}</span><span class="s">${bestTop ? esc(bestTop.player) + ' · ' + fmtX(bestTop.afk / a.base) + ' yours' : ''}</span></div>
@@ -1415,7 +1415,7 @@ const ICONS = /*__ICONS__*/;
   };
 
   // Boot ----------------------------------------------------------------------
-  $('benchDate').textContent = new Date(BENCH.createdAt).toLocaleDateString('de-CH', { dateStyle: 'long' });
+  $('benchDate').textContent = new Date(BENCH.createdAt).toLocaleDateString('en-GB', { dateStyle: 'long' });
   try { localStorage.removeItem('sampling-gear-companion:analysis:v4'); } catch (e) {} // old per-tool import, now on the Account page
   if (window.IdleonTools) { loadFromAccount(); window.IdleonTools.account.onChange(loadFromAccount); }
   else if (PRELOADED) { $('acctLink').hidden = true; loadAnalysis(PRELOADED, 'Built-in save'); }

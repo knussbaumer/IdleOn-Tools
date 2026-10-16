@@ -122,7 +122,7 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', renderBar); else renderBar();
 
   /** "12 Oct 2026, 14:05" for a timestamp, used by every page for the save date. */
-  const when = (t) => (t ? new Date(t).toLocaleString('de-CH', { dateStyle: 'medium', timeStyle: 'short' }) : 'unknown time');
+  const when = (t) => (t ? new Date(t).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : 'unknown time');
 
   window.IdleonTools = { root: ROOT, page: PAGE, theme, account, cache, when, esc, fingerprint };
 })();

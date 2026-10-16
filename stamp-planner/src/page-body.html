@@ -14,7 +14,7 @@
     <span>Export your account from IdleonToolbox as JSON and import it once on the <a href="../account/">Account page</a>. Every tool on this site uses it; nothing is uploaded anywhere.</span>
   </div>
   <div class="strip" id="factStrip">
-    <div class="fact x"><span class="k">Exalted Stamps</span><span class="v"><span id="xCount"></span> exalted</span><span class="s">Their bonus is multiplied by <span id="xMulti"></span> (Compass). Marked with a pink frame below.</span></div>
+    <div class="fact x"><span class="k">Exalted Stamps</span><span class="v"><span id="xCount"></span> exalted</span><span class="s">The Compass multiplies their bonus by <span id="xMulti"></span>. Marked with a pink frame below.</span></div>
     <div class="fact"><span class="k">Coins</span><span class="v" id="money"></span><span class="s">Biggest coins first, 100 of one coin make the next. Coin costs above this show in red.</span></div>
     <div class="fact"><span class="k">No Stamp Left Behind</span><span class="v"><span id="nslb"></span> levels / day</span><span class="s">Free random levels. They also push stamps into higher-cost tiers over time.</span></div>
     <div class="fact"><span class="k">Best carrier</span><span class="v" id="bestCarrier"></span><span class="s" id="bestCarrierSub"></span></div>
@@ -91,7 +91,7 @@
 <section class="notes" aria-label="How this is calculated">
   <h2 style="font-size:16px;color:var(--ink)">How this is calculated</h2>
   <p>Material cost for the next tier = base cost × growth<sup>(tier − 1)<sup>0.8</sup></sup>, then × 0.05 with a Gilded Stamp, × (1 − Hydrogen%) and your vial and sigil discounts. Per-slot carry capacity is capped at 2.05B, and a character can hold the material across all inventory slots. "Max carry" is the best of your characters for that material type.</p>
-  <p>"Tiers in reach" counts how many more material upgrades fit, holding your current capacity fixed. In the carry capacity table it uses Gilded + 90%; in the planner it follows the reduction you picked. Gear stamps (bags, tools, armour) count items, and each takes a whole slot.</p>
+  <p>"Tiers in reach" counts how many more material upgrades fit, holding your current capacity fixed. In the carry capacity table it uses Gilded + 90%; in the planner it follows the reduction you picked. Gear stamps (bags, tools, armor) count items, and each takes a whole slot.</p>
   <p>"Coins to next tier" is the coin cost of the levels between now and the next material upgrade: up to your current max level, or, if you're already at max, the levels the next material upgrade unlocks. "Coins to out of reach" adds up every coin level up to the last tier you can still carry; red means it is more than you have.</p>
   <p>"In storage" is what sits in your storage chest. Many materials are at 1.05B, while upgrades here often need tens of billions, so storage is a second wall on top of carry capacity.</p>
   <p>The save comes from the Account page and runs through the IdleonToolbox parser in your browser; it is never uploaded. The result is kept in this browser until you import a newer save.</p>
@@ -240,7 +240,7 @@
     $('nslb').textContent = D.meta.nslb;
     $('money').innerHTML = D.meta.money != null ? coinsHtml(D.meta.money, 3) : 'import a save';
     $('xCount').textContent = D.stamps.filter(s => s.x).length;
-    $('xMulti').textContent = D.meta.exaltedMulti != null ? '×' + (1 + D.meta.exaltedMulti / 100).toFixed(2) : 'the Compass bonus';
+    $('xMulti').textContent = D.meta.exaltedMulti != null ? (1 + D.meta.exaltedMulti / 100).toFixed(2) : 'its Compass bonus';
     const mats = D.stamps.filter(s => !s.q);
     const maxCap = Math.max(...mats.map(s => s.cap));
     const top = mats.find(s => s.cap === maxCap);

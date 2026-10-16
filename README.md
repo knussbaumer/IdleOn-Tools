@@ -15,7 +15,7 @@ Calculators for [Legends of IdleOn](https://www.legendsofidleon.com/), all in on
 ```
 index.html              landing page
 account/                the Account page: the one place to import a save, plus the theme switch
-assets/theme.css        shared "Arcade" theme: colour tokens (light and dark), fonts, top bar, panels, buttons
+assets/theme.css        shared "Arcade" theme: color tokens (light and dark), fonts, top bar, panels, buttons
 assets/site.js          shared script: applies the theme, draws the top bar, stores the save (IndexedDB) and tool caches
 assets/classes/         class icons for the Account page
 sampling-gear-companion/      index.html, its sources (src/), data snapshot (data/) and build scripts
