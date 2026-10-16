@@ -317,7 +317,7 @@ const ICONS = /*__ICONS__*/;
   };
 
   // The save comes from the shared Account page (assets/site.js). The analysis takes ~10 s, so it is cached per save.
-  const CACHE_VERSION = 'v5-' + BENCH.createdAt;
+  const CACHE_VERSION = 'v6-' + BENCH.createdAt;
   let loadSeq = 0;
   const loadFromAccount = async () => {
     const T = window.IdleonTools;
@@ -939,7 +939,7 @@ const ICONS = /*__ICONS__*/;
   };
   // Checks shown right under the character picker: Right Hand of Action, star talents, talent levels / library.
   const checksHtml = (skill, char) => {
-    const lab = SK_ICON[skill].label, low = lab.toLowerCase();
+    const lab = SKILL_META[skill].tab, low = lab.toLowerCase();
     const row = (cls, icon, html) => `<div class="chk-row ${cls}">${icon ? `<img class="ico" src="${ICONS[icon] || ''}" alt="">` : '<span></span>'}<div class="t">${html}</div></div>`;
     const out = [];
     const h = char?.hand?.[skill];
@@ -955,11 +955,13 @@ const ICONS = /*__ICONS__*/;
     const sp = char?.supers?.[skill];
     const pre = sp ? ` on talent preset ${(sp.talentPreset ?? 0) + 1}` : '';
     if (Array.isArray(stars)) {
-      const real = stars.filter((s) => s.maxLevel <= 10000), open = stars.filter((s) => s.maxLevel > 10000);
-      const gainTxt = (s) => { const v = includeSnap ? s.effS : s.eff; const bits = []; if ((v || 1) > 1.00005) bits.push(fmtX(v) + ' efficiency'); if ((s.afk || 1) > 1.00005) bits.push(fmtX(s.afk) + ' AFK gains'); return bits.length ? 'maxing it: ' + bits.join(', ') : 'maxing it adds under 0.01%'; };
-      const li = (s) => `<li>${ic('UISkillIcon' + s.skillIndex)} <strong>${esc(tname(s.name))}</strong> ${fmt(s.level)} / ${fmt(s.maxLevel)} · ${s.maxLevel > 10000 ? gainTxt(s).replace('maxing it:', 'even fully maxed only') : gainTxt(s)}</li>`;
-      if (real.length) out.push(row('warn', 'UISkillIcon' + real[0].skillIndex, `<strong>${real.length} star ${real.length === 1 ? 'talent is' : 'talents are'} not maxed${pre}.</strong><span>They raise ${low}; put star talent points into them.</span><ul>${real.map(li).join('')}</ul>`));
+      const gainOf = (r) => { const v = includeSnap ? r.effS : r.eff; const bits = []; if ((v || 1) > 1.00005) bits.push(fmtX(v) + ' efficiency'); if ((r.afk || 1) > 1.00005) bits.push(fmtX(r.afk) + ' AFK gains'); return bits.length ? bits.join(', ') : 'under 0.01%'; };
+      const notMax = stars.filter((s) => s.notMaxed && s.maxLevel <= 10000), open = stars.filter((s) => s.notMaxed && s.maxLevel > 10000), vipUp = stars.filter((s) => s.toLib);
+      const li = (s) => `<li>${ic('UISkillIcon' + s.skillIndex)} <strong>${esc(tname(s.name))}</strong> ${fmt(s.level)} / ${fmt(s.maxLevel)} · ${s.maxLevel > 10000 ? 'even fully maxed: ' : 'maxing it: '}${gainOf(s)}</li>`;
+      const vli = (s) => `<li>${ic('UISkillIcon' + s.skillIndex)} <strong>${esc(tname(s.name))}</strong>: max level ${fmt(s.toLib.from)}, a VIP book can take it to ${fmt(s.toLib.to)} (VIP Bookshelf, needs ${fmt(s.vip)}% VIP Membership). Read it, then level it: ${gainOf(s.toLib)}.</li>`;
+      if (notMax.length) out.push(row('warn', 'UISkillIcon' + notMax[0].skillIndex, `<strong>${notMax.length} star ${notMax.length === 1 ? 'talent is' : 'talents are'} not maxed${pre}.</strong><span>They raise ${low}; put star talent points into them.</span><ul>${notMax.map(li).join('')}</ul>`));
       else out.push(row('', null, `<strong>Every star talent that matters for ${low} is maxed${pre}.</strong>`));
+      if (vipUp.length) out.push(row('warn', 'UISkillIcon' + vipUp[0].skillIndex, `<strong>Star talents the library can still raise.</strong><span>Seven star talents have books on the library's VIP Bookshelf.</span><ul>${vipUp.map(vli).join('')}</ul>`));
       if (open.length) out.push(row('soft', 'UISkillIcon' + open[0].skillIndex, `<strong>Open-ended star ${open.length === 1 ? 'talent' : 'talents'}.</strong><span>These have a cap you will not reach in practice; every point still helps a little.</span><ul>${open.map(li).join('')}</ul>`));
     }
     if (sp && sp.list.some((t) => t.sup)) {
@@ -969,7 +971,7 @@ const ICONS = /*__ICONS__*/;
         ...lv.map((t) => `<li>${ic('UISkillIcon' + t.skillIndex)} <strong>${esc(tname(t.name))}</strong>: level ${fmt(t.toMax.from)} of ${fmt(t.toMax.to)}. Spend talent points to max it: ${g(t.toMax)}.</li>`),
         ...lib.map((t) => `<li>${ic('UISkillIcon' + t.skillIndex)} <strong>${esc(tname(t.name))}</strong>: max level ${fmt(t.toLib.from)}, the Talent Book Library goes up to ${fmt(t.toLib.to)}. Read its book, then level it: ${g(t.toLib)}.</li>`)];
       if (items.length) out.push(row('warn', 'UISkillIcon' + (lv[0] || lib[0]).skillIndex, `<strong>Talents that can still go higher${pre}.</strong><ul>${items.join('')}</ul>`));
-      else out.push(row('', null, `<strong>Every talent that matters for ${low} is at its max${sp.bookMax ? `, and the library's max (${fmt(sp.bookMax)}) is reached` : ''}.</strong> <span class="muted">Star talents can't be raised with library books.</span>`));
+      else out.push(row('', null, `<strong>Every talent that matters for ${low} is at its max${sp.bookMax ? `, and the library's max (${fmt(sp.bookMax)}) is reached` : ''}.</strong> <span class="muted">Class talents, and the seven star talents on the VIP Bookshelf, get their max raised by library books.</span>`));
     }
     return out.length ? `<section class="checks" aria-label="Character checks">${out.join('')}</section>` : '';
   };

@@ -225,25 +225,34 @@ export const superTalentPlan = (c, characters, account, skill, pi, loadout) => {
   return { bonus, bookMax, slotsUsed: (v.flatTalents || []).filter((t) => t?.isSuperTalent).length, list: out.concat(extra) };
 };
 
-// Star talents that matter for this skill and are below their max level: what maxing them would do.
+// Star talents on the library's VIP Bookshelf (unlocked by VIP Membership %): their max level can be raised
+// with books like class talents. From the IdleOn wiki, Talent Book Library page.
+const VIP_BOOKS = { TIPTOE_QUICKNESS: 1, UBERCHARGED_HEALTH: 10, COINS_FOR_CHARON: 30, AMERICAN_TIPPER: 75, OVERACCURATE_CRIT: 125, ANCIENT_MULTITOOL: 500, STATUE_METALLURGY: 1000 };
+// Star talents that matter for this skill and are below their max level (or, for VIP books, below the
+// library's max): what maxing them would do.
 export const starTalentCheck = (c, characters, account, skill, pi, loadout) => {
   const v = loadout || c;
+  const bookMax = c?.maxBookLv ?? null;
   const base = skillMetrics(skill, v, c, characters, account, pi, false); if (!base.eff) return null;
   const baseS = skillMetrics(skill, v, c, characters, account, pi, true, base);
   const list = [];
   for (const t of v.flatStarTalents || []) {
-    if (!t?.name || /^_|FILLER/.test(t.name) || !(t.maxLevel > 0) || !((t.level || 0) < t.maxLevel)) continue;
+    const vip = VIP_BOOKS[t?.name] ?? null;
+    const libUp = vip != null && bookMax && (t.maxLevel ?? 0) < bookMax;
+    if (!t?.name || /^_|FILLER/.test(t.name) || !(t.maxLevel > 0 || libUp) || !((t.level || 0) < t.maxLevel || libUp)) continue;
     // Relevant if the talent does anything for this skill at all (0 against max), however little is left.
     const txt = talentText(t);
     const zero = setTalentLevel(v, t.skillIndex, 0);
     const z = skillMetrics(skill, zero, c, characters, account, pi, false, null, { afk: AFK_RE.test(txt) ? null : base.afk });
     const zS = skillMetrics(skill, zero, c, characters, account, pi, true, z, RES_RE.test(txt) ? {} : { noRes: true, snapPi: baseS.pi });
-    const full = compare(skill, v, c, characters, account, pi, z, zS, t.skillIndex, 0, t.maxLevel, null, null, t);
+    const top = libUp ? bookMax : t.maxLevel;
+    const full = compare(skill, v, c, characters, account, pi, z, zS, t.skillIndex, 0, top, null, null, t);
     if (!meaningful(full, 1e-6)) continue;
-    const r = compare(skill, v, c, characters, account, pi, base, baseS, t.skillIndex, t.level || 0, t.maxLevel, null, null, t);
+    const r = (t.level || 0) < t.maxLevel ? compare(skill, v, c, characters, account, pi, base, baseS, t.skillIndex, t.level || 0, t.maxLevel, null, null, t) : { eff: 1, afk: 1, effS: 1, power: 0, sample: 1, sampleS: 1 };
+    const toLib = libUp ? { from: t.maxLevel, to: bookMax, ...compare(skill, v, c, characters, account, pi, base, baseS, t.skillIndex, t.level || 0, bookMax, null, null, t) } : null;
     // Highest max level any of your characters has for this star talent.
     const best = Math.max(...(characters || []).map((x) => (x.flatStarTalents || []).find((y) => y?.skillIndex === t.skillIndex)?.maxLevel ?? 0));
-    list.push({ skillIndex: t.skillIndex, name: t.name, level: t.level || 0, maxLevel: t.maxLevel, bestMax: best, description: t.description, ...r });
+    list.push({ skillIndex: t.skillIndex, name: t.name, level: t.level || 0, maxLevel: t.maxLevel, bestMax: best, description: t.description, vip, bookMax, toLib, notMaxed: (t.level || 0) < t.maxLevel, ...r });
   }
   list.sort((a, b) => b.sampleS - a.sampleS);
   return list;
